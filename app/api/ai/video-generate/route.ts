@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/auth"
+import { prisma } from "@/lib/prisma"
 
 const USEAPI_BASE = "https://api.useapi.net/v1/google-flow"
 const CAPTCHA_BROKER_URL = process.env.CAPTCHA_BROKER_URL || "http://localhost:4000"
 const CAPTCHA_BROKER_KEY = process.env.CAPTCHA_BROKER_KEY || "sk-admin-change-me"
 const MAX_CAPTCHA_RETRIES = 3
+
+/** Credit cost per video — must match CREDIT_COST_VIDEO in generation-queue.tsx */
+const CREDIT_COST_VIDEO = 10
 
 /**
  * In-memory job store for async video generation.
@@ -15,6 +20,7 @@ interface VideoJob {
   status: "processing" | "done" | "error"
   data?: Record<string, unknown>
   error?: string
+  creditsDeducted?: number
   createdAt: number
 }
 
@@ -52,10 +58,54 @@ async function getCaptchaToken(): Promise<string | null> {
 }
 
 /**
+ * Deduct credits for a user after successful generation.
+ */
+async function deductCredits(userId: string, videoCount: number, feature: string) {
+  const amount = videoCount * CREDIT_COST_VIDEO
+  try {
+    const credits = await prisma.user_credits.findUnique({ where: { userId } })
+    const currentBalance = credits?.balance ?? 0
+    const newBalance = Math.max(0, currentBalance - amount)
+
+    await prisma.$transaction([
+      prisma.user_credits.upsert({
+        where: { userId },
+        update: { balance: newBalance, updatedAt: new Date() },
+        create: { id: crypto.randomUUID(), userId, balance: newBalance, updatedAt: new Date() },
+      }),
+      prisma.credit_transactions.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId,
+          type: "deduct",
+          amount: -amount,
+          balance: newBalance,
+          description: `Video generation (${feature})`,
+          feature,
+        },
+      }),
+    ])
+
+    console.log(`[video-generate] Credits deducted: ${amount} for user ${userId}. Balance: ${currentBalance} → ${newBalance}`)
+    return amount
+  } catch (err) {
+    console.error(`[video-generate] Failed to deduct credits for user ${userId}:`, err)
+    return 0
+  }
+}
+
+/**
  * Run the actual video generation (called in background).
  */
-async function runVideoGeneration(jobId: string, basePayload: Record<string, unknown>, mode: string) {
+async function runVideoGeneration(
+  jobId: string,
+  basePayload: Record<string, unknown>,
+  mode: string,
+  userId: string,
+  feature: string
+) {
   const token = process.env.USEAPI_TOKEN!
+  const videoCount = (basePayload.count as number) || 1
 
   try {
     for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
@@ -100,8 +150,10 @@ async function runVideoGeneration(jobId: string, basePayload: Record<string, unk
           return
         }
 
+        // Success (fallback) — deduct credits
+        const deducted = await deductCredits(userId, videoCount, feature)
         console.log(`[video-generate] Job ${jobId}: Success (fallback)! videos=${fallbackData.media?.length || 0}`)
-        videoJobs.set(jobId, { id: jobId, status: "done", data: fallbackData, createdAt: Date.now() })
+        videoJobs.set(jobId, { id: jobId, status: "done", data: fallbackData, creditsDeducted: deducted, createdAt: Date.now() })
         return
       }
 
@@ -112,9 +164,10 @@ async function runVideoGeneration(jobId: string, basePayload: Record<string, unk
         return
       }
 
-      // Success
+      // Success — deduct credits
+      const deducted = await deductCredits(userId, videoCount, feature)
       console.log(`[video-generate] Job ${jobId}: Success! jobId=${data.jobId}, videos=${data.media?.length || 0}`)
-      videoJobs.set(jobId, { id: jobId, status: "done", data, createdAt: Date.now() })
+      videoJobs.set(jobId, { id: jobId, status: "done", data, creditsDeducted: deducted, createdAt: Date.now() })
       return
     }
 
@@ -132,6 +185,7 @@ async function runVideoGeneration(jobId: string, basePayload: Record<string, unk
 /**
  * POST /api/ai/video-generate
  * Starts video generation in background and returns jobId immediately.
+ * Credits are deducted server-side upon successful generation.
  * Client should poll GET /api/ai/video-generate?jobId=xxx for results.
  */
 export async function POST(req: NextRequest) {
@@ -140,15 +194,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
   }
 
+  // Auth check
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const {
       prompt, model, aspectRatio, duration, count, seed,
       startImage, endImage, referenceImages, voice, email,
+      feature, // optional: "video-generator", "review-product", etc.
     } = body
+
+    // New clients send async:true for polling mode
+    const useAsync = body.async === true
 
     if (!prompt) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 })
+    }
+
+    // Check credit balance before starting
+    const videoCount = count || 1
+    const requiredCredits = videoCount * CREDIT_COST_VIDEO
+    const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
+    const currentBalance = credits?.balance ?? 0
+
+    if (currentBalance < requiredCredits) {
+      return NextResponse.json(
+        { error: `Kredit tidak cukup. Butuh ${requiredCredits}, saldo: ${currentBalance}` },
+        { status: 402 }
+      )
     }
 
     // Build base payload
@@ -157,7 +234,7 @@ export async function POST(req: NextRequest) {
       model: model || "veo-3.1-fast",
       aspectRatio: aspectRatio || "landscape",
       duration: duration || 8,
-      count: count || 1,
+      count: videoCount,
     }
 
     if (seed !== undefined && seed !== null) basePayload.seed = seed
@@ -174,21 +251,43 @@ export async function POST(req: NextRequest) {
 
     const mode = startImage ? "I2V" : referenceImages?.length ? "R2V" : "T2V"
 
-    // Create job ID and start in background
-    const jobId = `vj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    videoJobs.set(jobId, { id: jobId, status: "processing", createdAt: Date.now() })
+    if (useAsync) {
+      // ── ASYNC MODE (new clients) ──
+      // Return jobId immediately, client polls GET for results
+      const jobId = `vj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      videoJobs.set(jobId, { id: jobId, status: "processing", createdAt: Date.now() })
 
-    // Fire and forget — runs in background, does NOT block the response
-    runVideoGeneration(jobId, basePayload, mode)
+      runVideoGeneration(jobId, basePayload, mode, session.user.id, feature || "video-generator")
 
-    console.log(`[video-generate] Job ${jobId} started (mode=${mode}, model=${basePayload.model})`)
+      console.log(`[video-generate] Job ${jobId} started ASYNC (mode=${mode}, model=${basePayload.model}, user=${session.user.id})`)
 
-    // Return immediately with jobId
-    return NextResponse.json({
-      jobId,
-      status: "processing",
-      message: "Video generation started. Poll GET /api/ai/video-generate?jobId=xxx for results.",
-    })
+      return NextResponse.json({
+        jobId,
+        status: "processing",
+        message: "Poll GET /api/ai/video-generate?jobId=xxx for results.",
+      })
+    } else {
+      // ── SYNC MODE (old clients / backward compatible) ──
+      // Block until generation completes (may timeout on Safari)
+      const jobId = `vj-sync-${Date.now()}`
+      videoJobs.set(jobId, { id: jobId, status: "processing", createdAt: Date.now() })
+
+      console.log(`[video-generate] Job ${jobId} started SYNC (mode=${mode}, model=${basePayload.model}, user=${session.user.id})`)
+
+      await runVideoGeneration(jobId, basePayload, mode, session.user.id, feature || "video-generator")
+
+      const job = videoJobs.get(jobId)
+      videoJobs.delete(jobId)
+
+      if (!job || job.status === "error") {
+        return NextResponse.json(
+          { error: job?.error || "Generation failed" },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json(job.data)
+    }
   } catch (error) {
     console.error("Video generation error:", error)
     return NextResponse.json(
@@ -201,6 +300,7 @@ export async function POST(req: NextRequest) {
 /**
  * GET /api/ai/video-generate?jobId=xxx
  * Poll for video generation status.
+ * Returns creditsDeducted when done so client can update UI.
  */
 export async function GET(req: NextRequest) {
   const jobId = req.nextUrl.searchParams.get("jobId")
@@ -219,14 +319,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (job.status === "error") {
-    // Clean up after returning error
     videoJobs.delete(jobId)
     return NextResponse.json({ jobId, status: "error", error: job.error }, { status: 500 })
   }
 
-  // Done — return the full UseAPI response data
+  // Done — return the full UseAPI response data + creditsDeducted
+  const creditsDeducted = job.creditsDeducted
   videoJobs.delete(jobId)
-  return NextResponse.json({ jobId, status: "done", ...job.data })
+  return NextResponse.json({ jobId, status: "done", creditsDeducted, ...job.data })
 }
 
 // Keep maxDuration for the POST handler context

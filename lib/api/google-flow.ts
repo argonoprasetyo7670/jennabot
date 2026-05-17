@@ -275,7 +275,7 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
   const startRes = await fetch("/api/ai/video-generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, async: true }),
   })
 
   const startData = await startRes.json()

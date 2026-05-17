@@ -210,7 +210,7 @@ export default function ReviewProductPage() {
       if (!img) throw new Error("Gagal membuat gambar")
       setGeneratedImage(img)
 
-      // Step 4: Generate video from image (I2V)
+      // Step 4: Generate video from image (I2V) — credits deducted server-side
       setPhase("generating-video")
       updateJob(jobId, { progress: "Membuat video (60-180 detik)..." })
       console.log("[review-product] Starting video generation with startImage:", img.mediaGenerationId)
@@ -228,10 +228,10 @@ export default function ReviewProductPage() {
       const proxiedUrl = `/api/ai/video-download?url=${encodeURIComponent(vid.url)}&filename=review-video.mp4`
       setGeneratedVideo({ ...vid, url: vid.url, proxyUrl: proxiedUrl } as GeneratedVideo & { proxyUrl?: string })
 
-      // Deduct credits
+      // Deduct image credits only (video credits handled server-side)
       await fetch("/api/credits", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: creditCost, feature: "review-product", description: "Review Product (image + video)" }),
+        body: JSON.stringify({ amount: CREDIT_COST_IMAGE, feature: "review-product-image", description: "Review Product (image)" }),
       })
       window.dispatchEvent(new CustomEvent("credits-updated"))
 

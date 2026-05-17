@@ -45,12 +45,41 @@ export interface GenerationJob {
 
 /* ─── Window-level global store (survives HMR + navigation) ─── */
 const STORE_KEY = "__jenna_gen_queue__"
+const LS_KEY = "jenna_gen_queue_jobs"
 type Listener = () => void
 
 interface GlobalStore {
   jobs: GenerationJob[]
   listeners: Set<Listener>
   version: number
+}
+
+/** Serialize jobs to localStorage (strip non-serializable fields like File) */
+function saveJobsToLS(jobs: GenerationJob[]) {
+  try {
+    const serializable = jobs.map((j) => ({
+      ...j,
+      references: undefined, // File objects can't be serialized
+      params: { prompt: (j.params as { prompt?: string }).prompt || "" },
+    }))
+    localStorage.setItem(LS_KEY, JSON.stringify(serializable))
+  } catch { /* quota exceeded or private browsing */ }
+}
+
+/** Load jobs from localStorage */
+function loadJobsFromLS(): GenerationJob[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as GenerationJob[]
+    return parsed.map((j) => ({
+      ...j,
+      createdAt: new Date(j.createdAt),
+      completedAt: j.completedAt ? new Date(j.completedAt) : undefined,
+      images: j.images || [],
+      videos: j.videos || [],
+    }))
+  } catch { return [] }
 }
 
 function getStore(): GlobalStore {
@@ -60,7 +89,11 @@ function getStore(): GlobalStore {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (!(window as any)[STORE_KEY]) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any)[STORE_KEY] = { jobs: [], listeners: new Set(), version: 0 }
+    (window as any)[STORE_KEY] = {
+      jobs: loadJobsFromLS(),
+      listeners: new Set(),
+      version: 0,
+    }
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (window as any)[STORE_KEY]
@@ -69,6 +102,7 @@ function getStore(): GlobalStore {
 function emitChange() {
   const store = getStore()
   store.version++
+  saveJobsToLS(store.jobs)
   store.listeners.forEach((l) => l())
 }
 
@@ -280,16 +314,14 @@ function submitVideoJobToStore(
 
       const result = await generateVideos(videoParams)
 
-      // Deduct credits only on success: count × 20 credits per video
-      const videoCount = result.videos.length || 1
-      const creditCost = videoCount * CREDIT_COST_VIDEO
-      await deductCredits(creditCost, "video-generator", `Generate ${videoCount} video (${params.model})`)
+      // Credits are deducted server-side on success. Just update UI.
+      window.dispatchEvent(new CustomEvent("credits-updated"))
 
       updateJobInStore(id, {
         status: "done",
         progress: undefined,
         videos: result.videos,
-        creditsDeducted: creditCost,
+        creditsDeducted: result.remainingCredits !== undefined ? (videoParams.count || 1) * CREDIT_COST_VIDEO : 0,
         completedAt: new Date(),
       })
     } catch (err) {
@@ -355,6 +387,97 @@ export function useGenerationQueue() {
 export function GenerationQueueProvider({ children }: { children: React.ReactNode }) {
   const jobs = React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   const activeCount = jobs.filter((j) => j.status === "uploading" || j.status === "generating").length
+
+  // Resume polling for video jobs that were processing before refresh
+  React.useEffect(() => {
+    const store = getStore()
+    const processingVideoJobs = store.jobs.filter(
+      (j) => j.type === "video" && (j.status === "uploading" || j.status === "generating") && j.id.startsWith("vj-")
+    )
+
+    for (const job of processingVideoJobs) {
+      // Extract the server jobId (the job.id IS the server jobId for async video jobs)
+      const serverJobId = job.id
+      console.log(`[queue] Resuming polling for job ${serverJobId}...`)
+      updateJobInStore(serverJobId, { progress: "Melanjutkan polling setelah refresh..." })
+
+      // Resume polling
+      ;(async () => {
+        const POLL_INTERVAL = 5000
+        const MAX_POLLS = 60
+
+        for (let i = 0; i < MAX_POLLS; i++) {
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+          try {
+            const res = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(serverJobId)}`)
+            const data = await res.json()
+
+            if (data.status === "processing") {
+              updateJobInStore(serverJobId, { progress: `Masih membuat video... (${(i + 1) * 5}s)` })
+              continue
+            }
+
+            if (data.status === "error") {
+              updateJobInStore(serverJobId, {
+                status: "error", progress: undefined,
+                error: data.error || "Generation failed",
+                completedAt: new Date(),
+              })
+              return
+            }
+
+            if (data.status === "done") {
+              // Parse videos from response
+              const videos = (data.media || [])
+                .map((m: Record<string, unknown>) => {
+                  const videoUrl = m.videoUrl as string | undefined
+                  if (!videoUrl) return null
+                  const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
+                  return {
+                    url: videoUrl,
+                    seed: gen?.seed as number | undefined,
+                    mediaGenerationId: m.mediaGenerationId as string | undefined,
+                  }
+                })
+                .filter(Boolean)
+
+              updateJobInStore(serverJobId, {
+                status: "done", progress: undefined,
+                videos,
+                creditsDeducted: data.creditsDeducted || 0,
+                completedAt: new Date(),
+              })
+              window.dispatchEvent(new CustomEvent("credits-updated"))
+              return
+            }
+          } catch {
+            // Network error, keep trying
+            if (i >= MAX_POLLS - 1) {
+              updateJobInStore(serverJobId, {
+                status: "error", progress: undefined,
+                error: "Polling timed out setelah refresh",
+                completedAt: new Date(),
+              })
+            }
+          }
+        }
+      })()
+    }
+
+    // Mark non-resumable processing jobs (image jobs, custom jobs) as interrupted
+    const nonResumable = store.jobs.filter(
+      (j) => (j.status === "uploading" || j.status === "generating") && !j.id.startsWith("vj-")
+    )
+    for (const job of nonResumable) {
+      updateJobInStore(job.id, {
+        status: "error", progress: undefined,
+        error: "Terhenti karena halaman di-refresh",
+        completedAt: new Date(),
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run once on mount
 
   const value = React.useMemo<GenerationQueueContextValue>(
     () => ({
