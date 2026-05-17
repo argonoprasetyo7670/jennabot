@@ -349,7 +349,8 @@ export async function GET(req: NextRequest) {
 
   try {
     // Fetch job status from UseAPI
-    const res = await fetch(`${USEAPI_BASE}/jobs/${encodeURIComponent(useapiJobId)}`, {
+    // DO NOT use encodeURIComponent — UseAPI jobIds contain : and @ that must stay as-is
+    const res = await fetch(`${USEAPI_BASE}/jobs/${useapiJobId}`, {
       headers: { Authorization: `Bearer ${apiToken}` },
     })
 

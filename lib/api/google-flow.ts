@@ -229,7 +229,8 @@ export interface GenerateVideoParams {
 }
 
 export interface GeneratedVideo {
-  url: string
+  url: string         // Proxy URL for playback (Safari Range support)
+  rawUrl?: string     // Original Google URL (for download)
   seed?: number
   mediaGenerationId?: string
   model?: string
@@ -315,14 +316,17 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
       if (pollData.status === "done") {
         console.log(`[video] Job ${jobId}: done!`)
         
-        // Parse the UseAPI response (same format as before)
+        // Parse the UseAPI response
         const videos: GeneratedVideo[] = (pollData.media || [])
           .map((m: Record<string, unknown>) => {
             const videoUrl = m.videoUrl as string | undefined
             if (!videoUrl) return null
             const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
+            // Use proxy URL for playback (Safari needs Range request support)
+            const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
             return {
-              url: videoUrl,
+              url: proxyUrl,
+              rawUrl: videoUrl, // Keep raw URL for download
               seed: gen?.seed as number | undefined,
               mediaGenerationId: m.mediaGenerationId as string | undefined,
               model: gen?.model as string | undefined,
