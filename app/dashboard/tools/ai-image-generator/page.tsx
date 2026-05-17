@@ -14,6 +14,7 @@ import {
   UploadIcon,
   ImageIcon,
   ArrowUpCircleIcon,
+  Settings2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -393,14 +394,72 @@ export default function AIImageGeneratorPage() {
 
             <div className="mb-1 flex shrink-0 items-center gap-1.5">
               <div className="relative">
+                {/* Mobile: gear icon only */}
+                <button onClick={() => setShowSettings(!showSettings)} className="sm:hidden flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground cursor-pointer transition-all hover:bg-muted">
+                  <Settings2Icon className="h-4 w-4" />
+                </button>
+                {/* Desktop: full text */}
                 <button onClick={() => setShowSettings(!showSettings)} className="hidden sm:flex items-center gap-1 rounded-lg bg-muted/50 px-2 py-1.5 text-[10px] text-muted-foreground cursor-pointer transition-all hover:bg-muted">
                   <span>{currentModel.icon}</span>
                   <span className="font-medium">{currentModel.name}</span>
                   <span className="ml-0.5 rounded bg-muted px-1 py-0.5 text-[9px]">x{IMAGE_COUNTS[selectedCount]}</span>
+                  <ChevronDownIcon className={cn("h-3 w-3 transition-transform", showSettings && "rotate-180")} />
                 </button>
 
+                {/* Mobile: bottom sheet overlay */}
                 {showSettings && (
-                  <div ref={settingsRef} className="absolute bottom-full right-0 mb-2 w-[320px] z-50">
+                  <div className="sm:hidden fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-sm" onClick={() => { setShowSettings(false); setShowModelDropdown(false) }}>
+                    <div ref={settingsRef} className="w-full rounded-t-2xl border-t border-border bg-card p-4 pb-6 shadow-2xl animate-fade-up" onClick={(e) => e.stopPropagation()}>
+                      {/* Drag handle */}
+                      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/20" />
+
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Aspect Ratio</p>
+                      <div className="flex gap-1.5 mb-3">
+                        {ASPECT_RATIOS.map((ratio, i) => (
+                          <button key={ratio} onClick={() => setSelectedRatio(i)} className={cn("flex flex-1 flex-col items-center gap-0.5 rounded-lg border py-2 text-[10px] font-medium transition-all", selectedRatio === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
+                            <RatioIcon index={i} />
+                            <span>{ratio}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Jumlah Gambar</p>
+                      <div className="flex gap-1.5 mb-3">
+                        {IMAGE_COUNTS.map((count, i) => (
+                          <button key={count} onClick={() => setSelectedCount(i)} className={cn("flex flex-1 items-center justify-center rounded-lg border py-2.5 text-xs font-medium transition-all", selectedCount === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
+                            x{count}
+                          </button>
+                        ))}
+                      </div>
+
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Model</p>
+                      <div className="relative">
+                        <button onClick={() => setShowModelDropdown(!showModelDropdown)} className="flex w-full items-center justify-between rounded-lg border border-transparent bg-muted/30 px-3 py-2.5 text-xs font-medium text-foreground/70 transition-all hover:bg-muted/50">
+                          <span className="flex items-center gap-2">
+                            <span>{currentModel.icon}</span>
+                            <span>{currentModel.name}</span>
+                          </span>
+                          <ChevronDownIcon className={cn("h-3.5 w-3.5 transition-transform", showModelDropdown && "rotate-180")} />
+                        </button>
+                        {showModelDropdown && (
+                          <div className="absolute bottom-full left-0 right-0 mb-1 rounded-xl border border-border bg-card p-1 shadow-2xl backdrop-blur-xl z-50">
+                            {MODELS.map((model, i) => (
+                              <button key={model.id} onClick={() => { setSelectedModel(i); setShowModelDropdown(false) }} className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-all", selectedModel === i ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50")}>
+                                <span>{model.icon}</span>
+                                <span>{model.name}</span>
+                                <span className="ml-auto text-[9px] text-muted-foreground/50">max {model.maxRefs} ref</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Desktop: floating popup */}
+                {showSettings && (
+                  <div ref={settingsRef} className="hidden sm:block absolute bottom-full right-0 mb-2 w-[320px] z-50">
                     <div className="rounded-2xl border border-border bg-card/95 p-3 backdrop-blur-xl shadow-2xl">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Aspect Ratio</p>
                       <div className="flex gap-1.5 mb-3">
