@@ -9,7 +9,7 @@ import {
 import { cn } from "@/lib/utils"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { LottieLoading } from "@/components/lottie-loading"
-import { CREDIT_COST_IMAGE, CREDIT_COST_VIDEO } from "@/contexts/generation-queue"
+import { useGenerationQueue, CREDIT_COST_IMAGE, CREDIT_COST_VIDEO, type GenerationJob } from "@/contexts/generation-queue"
 import {
   uploadImageAsset, generateImages, generateVideos,
   type GeneratedImage, type GeneratedVideo,
@@ -99,6 +99,7 @@ export default function ReviewProductPage() {
   const allReady = slots.model && slots.background && slots.product
   const isProcessing = phase !== "idle" && phase !== "done" && phase !== "error"
   const creditCost = CREDIT_COST_IMAGE + CREDIT_COST_VIDEO
+  const { addCustomJob, updateJob } = useGenerationQueue()
 
   const handleSlotUpload = (key: SlotKey) => { setActiveSlot(key); fileInputRef.current?.click() }
 
@@ -174,19 +175,33 @@ export default function ReviewProductPage() {
     const imagePrompt = `Professional product review photo, portrait orientation. A person identical to the MODEL in the reference is in the exact BACKGROUND from the reference. ${optParts}, showcasing the exact PRODUCT from the reference. Enthusiastic expression, product visible prominently. Photorealistic, studio lighting, high detail, 4K quality.${extra ? ` ${extra}` : ""}`
     const videoPrompt = `Smooth cinematic product review video, portrait format. The person is ${poseOpt?.prompt || "standing"} ${envOpt ? envOpt.prompt : ""}, ${actionOpt?.prompt || "holding the product"}, examining it from multiple angles, showing details to camera, ${langOpt.prompt}, speaking enthusiastically and naturally. Natural movements, professional lighting, smooth camera.${extra ? ` ${extra}` : ""}`
 
+    const jobId = `review-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+
     try {
+      // Add job to queue for bell notification
+      const queueJob: GenerationJob = {
+        id: jobId, type: "video", prompt: extra || "Review Product", model: "nano-banana-2 → veo-3.1",
+        status: "uploading", progress: "Menggabungkan gambar...",
+        images: [], videos: [], createdAt: new Date(),
+        params: { prompt: extra || "Review Product" },
+      }
+      addCustomJob(queueJob)
+
       // Step 1: Compose images
       setPhase("composing")
+      updateJob(jobId, { status: "uploading", progress: "Menggabungkan gambar..." })
       const compositeFile = await createComposite()
 
       // Step 2: Upload composite as reference
       setPhase("uploading-ref")
+      updateJob(jobId, { progress: "Mengupload referensi..." })
       const uploadResult = await uploadImageAsset(compositeFile)
       const refId = uploadResult.mediaGenerationId
       const email = uploadResult.email
 
       // Step 3: Generate image from reference
       setPhase("generating-image")
+      updateJob(jobId, { status: "generating", progress: "Membuat gambar review..." })
       const imgResult = await generateImages({
         prompt: imagePrompt, model: "nano-banana-2", aspectRatio: "3:4", count: 1,
         references: [refId], email,
@@ -196,19 +211,24 @@ export default function ReviewProductPage() {
       setGeneratedImage(img)
 
       // Step 4: Generate video from image (I2V)
-      // Use the generated image's mediaGenerationId directly — it's already in Google Flow
       setPhase("generating-video")
+      updateJob(jobId, { progress: "Membuat video (60-180 detik)..." })
+      console.log("[review-product] Starting video generation with startImage:", img.mediaGenerationId)
       const vidResult = await generateVideos({
         prompt: videoPrompt, model: "veo-3.1-fast", aspectRatio: "portrait",
         duration: 8, count: 1,
         startImage: img.mediaGenerationId,
-        email, // same account as image generation
+        email,
       })
+      console.log("[review-product] Video result:", JSON.stringify(vidResult, null, 2))
       const vid = vidResult.videos[0]
-      if (!vid) throw new Error("Gagal membuat video")
-      setGeneratedVideo(vid)
+      if (!vid || !vid.url) throw new Error("Gagal membuat video — tidak ada URL video di response")
+      
+      // Proxy video URL to avoid CORS issues
+      const proxiedUrl = `/api/ai/video-download?url=${encodeURIComponent(vid.url)}&filename=review-video.mp4`
+      setGeneratedVideo({ ...vid, url: vid.url, proxyUrl: proxiedUrl } as GeneratedVideo & { proxyUrl?: string })
 
-      // Step 6: Deduct credits (image + video)
+      // Deduct credits
       await fetch("/api/credits", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: creditCost, feature: "review-product", description: "Review Product (image + video)" }),
@@ -216,16 +236,26 @@ export default function ReviewProductPage() {
       window.dispatchEvent(new CustomEvent("credits-updated"))
 
       setPhase("done")
+      updateJob(jobId, {
+        status: "done", progress: undefined,
+        images: [img], videos: [vid],
+        creditsDeducted: creditCost, completedAt: new Date(),
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed")
       setPhase("error")
+      updateJob(jobId, {
+        status: "error", progress: undefined,
+        error: err instanceof Error ? err.message : "Generation failed",
+        completedAt: new Date(),
+      })
     }
   }
 
   const handleDownload = async (url: string, filename: string) => {
     try {
       const route = filename.endsWith(".mp4") ? "/api/ai/video-download" : "/api/ai/image-download"
-      const res = await fetch(`${route}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`)
+      const res = await fetch(`${route}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&mode=attachment`)
       const blob = await res.blob()
       const blobUrl = URL.createObjectURL(blob)
       const a = document.createElement("a"); a.href = blobUrl; a.download = filename
@@ -432,7 +462,7 @@ export default function ReviewProductPage() {
                   </h2>
                   <div className="overflow-hidden rounded-2xl border border-border bg-card/50">
                     <div className="relative aspect-[9/16] max-h-[500px] mx-auto cursor-pointer" onClick={() => setPreviewVideo(generatedVideo)}>
-                      <video src={generatedVideo.url} className="h-full w-full object-contain bg-background" muted loop autoPlay playsInline />
+                      <video src={(generatedVideo as GeneratedVideo & { proxyUrl?: string }).proxyUrl || generatedVideo.url} className="h-full w-full object-contain bg-background" muted loop autoPlay playsInline crossOrigin="anonymous" />
                     </div>
                     <div className="flex justify-center gap-1 border-t border-border py-2">
                       <button onClick={() => setPreviewVideo(generatedVideo)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
@@ -475,7 +505,7 @@ export default function ReviewProductPage() {
             <XIcon className="h-5 w-5" />
           </button>
           <div className="relative max-h-[90vh] max-w-[90vw] w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-            <video src={previewVideo.url} className="max-h-[80vh] w-full rounded-2xl object-contain" controls autoPlay playsInline />
+            <video src={(previewVideo as GeneratedVideo & { proxyUrl?: string }).proxyUrl || previewVideo.url} className="max-h-[80vh] w-full rounded-2xl object-contain" controls autoPlay playsInline crossOrigin="anonymous" />
             <div className="mt-4 flex items-center justify-center gap-2">
               <button onClick={() => handleDownload(previewVideo.url, "review-video.mp4")} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm hover:bg-white/20">
                 <DownloadIcon className="h-4 w-4" /> Download

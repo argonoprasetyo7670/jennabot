@@ -338,6 +338,8 @@ interface GenerationQueueContextValue {
     references?: { file?: File; galleryUrl?: string }[],
     frameRefs?: { startImage?: { file?: File; galleryUrl?: string }; endImage?: { file?: File; galleryUrl?: string } }
   ) => string
+  addCustomJob: (job: GenerationJob) => void
+  updateJob: (id: string, updates: Partial<GenerationJob>) => void
   clearJob: (id: string) => void
   clearCompleted: () => void
 }
@@ -360,6 +362,8 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
       activeCount,
       submitJob: submitJobToStore,
       submitVideoJob: submitVideoJobToStore,
+      addCustomJob: addJobToStore,
+      updateJob: updateJobInStore,
       clearJob: removeJobFromStore,
       clearCompleted: clearCompletedFromStore,
     }),
