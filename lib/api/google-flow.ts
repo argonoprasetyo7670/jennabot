@@ -245,7 +245,8 @@ export interface GenerateVideoResult {
 
 /**
  * Generate videos using Google Flow Veo 3.1 API.
- * Supports T2V, I2V (start/end frames), R2V (reference images), and voice narration.
+ * Uses non-blocking pattern: POST starts job → poll GET until done.
+ * This prevents Safari/iOS timeout issues on long generations (60-180s).
  */
 export async function generateVideos(params: GenerateVideoParams): Promise<GenerateVideoResult> {
   if (!params.prompt?.trim()) {
@@ -270,42 +271,86 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
     body.referenceImages = params.referenceImages
   }
 
-  const res = await fetch("/api/ai/video-generate", {
+  // Step 1: Start generation (returns immediately with jobId)
+  const startRes = await fetch("/api/ai/video-generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
 
-  const data = await res.json()
-  if (!res.ok) {
+  const startData = await startRes.json()
+  if (!startRes.ok) {
     throw new Error(
-      typeof data.error === "string" ? data.error : data.error?.message || `Generation failed (${res.status})`
+      typeof startData.error === "string" ? startData.error : startData.error?.message || `Generation failed (${startRes.status})`
     )
   }
 
-  const videos: GeneratedVideo[] = (data.media || [])
-    .map((m: Record<string, unknown>) => {
-      const videoUrl = m.videoUrl as string | undefined
-      if (!videoUrl) return null
-      const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
-      return {
-        url: videoUrl,
-        seed: gen?.seed as number | undefined,
-        mediaGenerationId: m.mediaGenerationId as string | undefined,
-        model: gen?.model as string | undefined,
-        aspectRatio: gen?.aspectRatio as string | undefined,
-        prompt: gen?.prompt as string | undefined,
+  const jobId = startData.jobId
+  if (!jobId) {
+    throw new Error("No jobId returned from server")
+  }
+
+  console.log(`[video] Job started: ${jobId}`)
+
+  // Step 2: Poll for results every 5 seconds (max 5 minutes)
+  const POLL_INTERVAL = 5000
+  const MAX_POLLS = 60 // 5 min max
+  
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+    try {
+      const pollRes = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(jobId)}`)
+      const pollData = await pollRes.json()
+
+      if (pollData.status === "processing") {
+        console.log(`[video] Job ${jobId}: still processing... (${(i + 1) * 5}s)`)
+        continue
       }
-    })
-    .filter(Boolean) as GeneratedVideo[]
 
-  if (videos.length === 0) {
-    throw new Error("No videos were generated. Try a different prompt.")
+      if (pollData.status === "error") {
+        throw new Error(pollData.error || "Video generation failed")
+      }
+
+      if (pollData.status === "done") {
+        console.log(`[video] Job ${jobId}: done!`)
+        
+        // Parse the UseAPI response (same format as before)
+        const videos: GeneratedVideo[] = (pollData.media || [])
+          .map((m: Record<string, unknown>) => {
+            const videoUrl = m.videoUrl as string | undefined
+            if (!videoUrl) return null
+            const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
+            return {
+              url: videoUrl,
+              seed: gen?.seed as number | undefined,
+              mediaGenerationId: m.mediaGenerationId as string | undefined,
+              model: gen?.model as string | undefined,
+              aspectRatio: gen?.aspectRatio as string | undefined,
+              prompt: gen?.prompt as string | undefined,
+            }
+          })
+          .filter(Boolean) as GeneratedVideo[]
+
+        if (videos.length === 0) {
+          throw new Error("No videos were generated. Try a different prompt.")
+        }
+
+        return {
+          jobId: pollData.jobId || "",
+          videos,
+          remainingCredits: pollData.remainingCredits,
+        }
+      }
+    } catch (err) {
+      // Network error during poll — keep trying
+      if (i < MAX_POLLS - 1) {
+        console.warn(`[video] Poll error (will retry):`, err)
+        continue
+      }
+      throw err
+    }
   }
 
-  return {
-    jobId: data.jobId || "",
-    videos,
-    remainingCredits: data.remainingCredits,
-  }
+  throw new Error("Video generation timed out after 5 minutes")
 }
