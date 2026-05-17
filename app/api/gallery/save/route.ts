@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { url, type, prompt, model, aspectRatio, mediaGenerationId } = await req.json()
+    const { url, type, prompt, model, aspectRatio, mediaGenerationId, sourceAction } = await req.json()
 
     if (!url) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         model: model || null,
         aspectRatio: aspectRatio || null,
         mediaGenerationId: mediaGenerationId || null,
-        sourceAction: "review-product",
+        sourceAction: sourceAction || "generate",
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
         updatedAt: new Date(),
       },

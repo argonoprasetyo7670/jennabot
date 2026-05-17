@@ -56,12 +56,12 @@ const navItems: NavItem[] = [
     icon: <LayoutDashboardIcon className="h-4 w-4" />,
     type: "link",
   },
-  {
-    title: "Tutorial",
-    url: "/tutorial",
-    icon: <BookOpenIcon className="h-4 w-4" />,
-    type: "link",
-  },
+  // {
+  //   title: "Tutorial",
+  //   url: "/tutorial",
+  //   icon: <BookOpenIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
   {
     title: "WA Group Chat",
     url: "https://chat.whatsapp.com/",
@@ -112,18 +112,18 @@ const navItems: NavItem[] = [
   //   icon: <MessageSquareIcon className="h-4 w-4" />,
   //   type: "link",
   // },
-  // {
-  //   title: "Buy Credits",
-  //   url: "/dashboard/buy-credits",
-  //   icon: <CoinsIcon className="h-4 w-4" />,
-  //   type: "link",
-  // },
-  // {
-  //   title: "Gallery",
-  //   url: "/dashboard/gallery",
-  //   icon: <GalleryHorizontalEndIcon className="h-4 w-4" />,
-  //   type: "link",
-  // },
+  {
+    title: "Buy Credits",
+    url: "/dashboard/buy-credits",
+    icon: <CoinsIcon className="h-4 w-4" />,
+    type: "link",
+  },
+  {
+    title: "Gallery",
+    url: "/dashboard/gallery",
+    icon: <GalleryHorizontalEndIcon className="h-4 w-4" />,
+    type: "link",
+  },
   // {
   //   title: "API Keys",
   //   url: "/dashboard/api-keys",

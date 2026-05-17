@@ -267,9 +267,7 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
   if (params.voice) body.voice = params.voice
 
   if (params.referenceImages?.length) {
-    params.referenceImages.forEach((ref, i) => {
-      body[`referenceImage_${i + 1}`] = ref
-    })
+    body.referenceImages = params.referenceImages
   }
 
   const res = await fetch("/api/ai/video-generate", {

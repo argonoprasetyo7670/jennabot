@@ -54,6 +54,7 @@ export default function AIVideoGeneratorPage() {
   const [previewVideo, setPreviewVideo] = useState<GeneratedVideo | null>(null)
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([])
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const plusMenuRef = useRef<HTMLDivElement>(null)
@@ -250,9 +251,32 @@ export default function AIVideoGeneratorPage() {
                       <DownloadIcon className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Download</span>
                     </button>
-                    <button onClick={() => alert("Video akan disimpan ke Gallery (coming soon)")} className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Simpan ke Gallery">
+                    <button
+                      onClick={async () => {
+                        if (savedVideos.has(vid.url)) return
+                        try {
+                          const res = await fetch("/api/gallery/save", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              url: vid.url,
+                              type: "video",
+                              prompt: activeJob?.prompt || "",
+                              model: activeJob?.model || "",
+                              aspectRatio: vid.aspectRatio || "",
+                              mediaGenerationId: vid.mediaGenerationId || "",
+                              sourceAction: "video-generator",
+                            }),
+                          })
+                          if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
+                        } catch { /* ignore */ }
+                      }}
+                      disabled={savedVideos.has(vid.url)}
+                      className={`flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted ${savedVideos.has(vid.url) ? "text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}
+                      title="Simpan ke Gallery"
+                    >
                       <ImagePlusIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Gallery</span>
+                      <span className="hidden sm:inline">{savedVideos.has(vid.url) ? "Tersimpan ✓" : "Gallery"}</span>
                     </button>
                   </div>
                 </div>

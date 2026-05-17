@@ -1,3 +1,5 @@
+import { LANDING_FEATURES } from "@/lib/features"
+
 export const heroTiles = [
   { src: "/jennabot/hero-1.webp", alt: "Workflow preview poster", title: "Product ads", className: "col-span-5 row-span-2 md:col-span-3" },
   { src: "/jennabot/hero-2.webp", alt: "AI storefront preview", title: "Marketplace drops", className: "col-span-7 row-span-2 md:col-span-4" },
@@ -12,68 +14,52 @@ export const stats = [
   { value: "99.9%", label: "Uptime", suffix: "" },
 ] as const;
 
-export const featureCards = [
-  {
-    icon: "image",
-    badge: "0.25 credit/image",
-    title: "Image Studio",
-    description: "Text-to-image, image-to-image, multiple model choices, and style control. Generate ads, concept art, posters, and storefront visuals from prompts or references.",
-    tags: ["Text to Image", "Image to Image", "Style Control", "Hi-Res Output"],
-  },
-  {
-    icon: "video",
-    badge: "3 credits/video",
-    title: "Video Studio",
-    description: "Produce clips from text, images, or reference-based inputs. Powered by Veo 3.1 for cinema-quality short-form video generation.",
-    tags: ["Text to Video", "Image to Video", "Veo 3.1", "Camera Control"],
-  },
-  {
-    icon: "workflow",
-    badge: "Node-based",
-    title: "Workflow Canvas",
-    description: "Compose and edit generation steps visually with a node-based canvas. Chain multiple AI operations into reusable, shareable production pipelines.",
-    tags: ["Visual Editor", "Reusable Flows", "AI Agent", "Premium Nodes"],
-  },
-  {
-    icon: "store",
-    badge: "Marketplace",
-    title: "NgatStore",
-    description: "Buy and sell workflow templates inside the dashboard. Monetize your creative workflows and earn 100% credits from every sale.",
-    tags: ["Sell Templates", "100% Earnings", "Community", "Instant Deploy"],
-  },
-] as const;
+/**
+ * Feature cards for landing page — auto-generated from lib/features.ts
+ * Icon mapping: image category → "image", video → "video"
+ */
+export const featureCards = LANDING_FEATURES.map((f) => ({
+  icon: f.category === "image" ? "image" : f.category === "video" ? "video" : "workflow",
+  badge: f.creditBadge || "AI Tool",
+  title: f.title,
+  description: f.description,
+  tags: f.tags,
+  url: f.url,
+  emoji: f.emoji,
+}));
 
 export const howItWorks = [
-  { step: "01", title: "Sign up in seconds", description: "Create your account with Google or email. Get instant access to all creation tools and a 7-day VIP trial." },
-  { step: "02", title: "Create with AI", description: "Generate images, videos, and visual content using state-of-the-art AI models. One credit system across all tools." },
-  { step: "03", title: "Build workflows", description: "Chain generation steps into reusable workflows with our visual canvas editor. Automate your creative pipeline." },
-  { step: "04", title: "Sell & earn", description: "List your workflow templates on NgatStore. Earn 100% credits from sales and grow your creator business." },
+  { step: "01", title: "Daftar dalam hitungan detik", description: "Buat akun dengan Google atau email. Dapatkan akses langsung ke semua AI tools dan kredit starter." },
+  { step: "02", title: "Buat dengan AI", description: "Generate gambar, video, dan konten visual menggunakan model AI terbaru. Satu sistem kredit untuk semua tools." },
+  { step: "03", title: "Download & Simpan", description: "Semua hasil disimpan di Gallery. Download kapan saja dalam resolusi tinggi, atau gunakan sebagai referensi." },
+  { step: "04", title: "Scale bisnis Anda", description: "Buat konten produk, review video, dan thumbnail secara massal untuk e-commerce dan media sosial." },
 ] as const;
 
 export const vipBullets = [
-  "Create unlimited workflows",
-  "Premium workflow nodes (Extend, Pose, Camera Control, Voice)",
-  "Workflow AI Agent assistant",
-  "Gallery access & management",
-  "Duplicate and share workflows by email",
-  "Selected offers include bonus credits",
+  "Akses semua Image Tools (Generator, Product, Model, Thumbnail)",
+  "AI Video Generator dengan Veo 3.1",
+  "Review Product otomatis (2-step pipeline)",
+  "Gallery management tanpa batas",
+  "Download resolusi tinggi",
+  "Bonus kredit di setiap pembelian",
 ] as const;
 
 export const faqItems = [
-  { q: "What is the difference between Basic and VIP?", a: "Basic gives you access to Image Studio, Video Studio, and up to 3 workflows. VIP unlocks unlimited workflows, premium nodes, Gallery, Workflow AI Agent, and sharing tools." },
-  { q: "Which payment methods are available?", a: "We support bank transfer, e-wallet (GoPay, OVO, Dana), and credit/debit cards through our Midtrans payment gateway." },
-  { q: "Can I sell templates on NgatStore?", a: "Yes! Any creator can list workflow templates on NgatStore. You earn 100% of the credit value from every sale." },
-  { q: "Can AI-generated content be used commercially?", a: "Absolutely. All generated content is positioned for business and marketing use cases. You own full commercial rights to your creations." },
-  { q: "How does the credit system work?", a: "Credits are a unified currency across all tools. Images cost 0.25 credits, videos cost 3 credits. Purchase credit packs or earn credits by selling templates." },
-  { q: "Is there a free trial?", a: "New accounts get a 7-day VIP trial with full access to premium features, plus starter credits to explore all creation tools." },
+  { q: "Apa saja fitur yang tersedia?", a: "Jenna Bot Pro menyediakan AI Image Generator, Product Studio, Model Studio, Thumbnail Generator, AI Video Generator, dan Review Product. Semua bisa diakses dari satu dashboard." },
+  { q: "Metode pembayaran apa yang tersedia?", a: "Kami mendukung transfer bank, e-wallet (GoPay, OVO, Dana), dan kartu kredit/debit melalui payment gateway Midtrans." },
+  { q: "Berapa biaya per generasi?", a: "Image generation menggunakan 5 poin per gambar. Video generation menggunakan 20 poin per video. Beli paket kredit untuk harga lebih murah." },
+  { q: "Apakah konten AI bisa digunakan secara komersial?", a: "Ya! Semua konten yang dihasilkan bisa digunakan untuk keperluan bisnis dan marketing. Anda memiliki hak komersial penuh." },
+  { q: "Bagaimana sistem kredit bekerja?", a: "Kredit adalah mata uang terpadu untuk semua tools. Beli paket kredit, gunakan untuk generate gambar atau video. Saldo bisa dipantau di dashboard." },
+  { q: "Apakah ada trial gratis?", a: "Akun baru mendapatkan kredit starter gratis untuk mencoba semua fitur. Top up kapan saja saat kredit habis." },
 ] as const;
 
 export const supportCards = [
-  { badge: "FREE", title: "WhatsApp Community", description: "Join the content creator community and get tips, ideas, and workflow inspiration from fellow creators.", href: "https://chat.whatsapp.com/" },
-  { badge: "PRIORITY", title: "CS Admin Support", description: "Contact customer support for direct help, payment issues, and production blockers. Fast response guaranteed.", href: "https://wa.me/" },
+  { badge: "FREE", title: "WhatsApp Community", description: "Gabung komunitas kreator dan dapatkan tips, ide, serta inspirasi dari sesama pengguna.", href: "https://chat.whatsapp.com/" },
+  { badge: "PRIORITY", title: "CS Admin Support", description: "Hubungi customer support untuk bantuan langsung, masalah pembayaran, dan kendala teknis.", href: "https://wa.me/" },
 ] as const;
 
 export const marqueeItems = [
-  "Image Generation", "Video Creation", "Workflow Canvas", "NgatStore", "AI Agent",
-  "Product Ads", "Poster Drafts", "Style Control", "Camera Control", "Hi-Res Output",
+  "AI Image Generator", "Product Studio", "Model Studio", "Thumbnail Generator",
+  "AI Video Generator", "Review Product", "Gallery", "Hi-Res Output",
+  "Veo 3.1", "Nano Banana Pro", "Imagen 4",
 ] as const;

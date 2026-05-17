@@ -183,8 +183,28 @@ export default function AIImageGeneratorPage() {
     }
   }
 
+  const [savedImages, setSavedImages] = useState<Set<string>>(new Set())
+
   const handleSaveToGallery = async (img: GeneratedImage) => {
-    alert("Gambar akan disimpan ke Gallery (coming soon)")
+    if (savedImages.has(img.url)) return
+    try {
+      const res = await fetch("/api/gallery/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: img.url,
+          type: "image",
+          prompt: activeJob?.prompt || "",
+          model: activeJob?.model || "",
+          aspectRatio: img.aspectRatio || "",
+          mediaGenerationId: img.mediaGenerationId || "",
+          sourceAction: "image-generator",
+        }),
+      })
+      if (res.ok) {
+        setSavedImages(prev => new Set(prev).add(img.url))
+      }
+    } catch { /* ignore */ }
   }
 
   const fetchGallery = useCallback(async () => {
@@ -275,9 +295,9 @@ export default function AIImageGeneratorPage() {
                       <DownloadIcon className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Download</span>
                     </button>
-                    <button onClick={() => handleSaveToGallery(img)} className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Simpan ke Gallery">
+                    <button onClick={() => handleSaveToGallery(img)} disabled={savedImages.has(img.url)} className={`flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted ${savedImages.has(img.url) ? "text-emerald-500" : "text-muted-foreground hover:text-foreground"}`} title="Simpan ke Gallery">
                       <ImagePlusIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Gallery</span>
+                      <span className="hidden sm:inline">{savedImages.has(img.url) ? "Tersimpan ✓" : "Gallery"}</span>
                     </button>
                     {img.mediaGenerationId && currentModel.id !== "imagen-4" && (
                       <button
@@ -454,7 +474,7 @@ export default function AIImageGeneratorPage() {
                   </button>
                 </>
               )}
-              <button onClick={() => handleSaveToGallery(previewImage)} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm transition hover:bg-white/20">
+              <button onClick={() => handleSaveToGallery(previewImage)} disabled={savedImages.has(previewImage.url)} className={`flex h-10 items-center gap-2 rounded-xl px-4 text-sm backdrop-blur-sm transition ${savedImages.has(previewImage.url) ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-white hover:bg-white/20"}`}>
                 <ImagePlusIcon className="h-4 w-4" /> Gallery
               </button>
               <button onClick={() => setPreviewImage(null)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20">

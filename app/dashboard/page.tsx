@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { DashboardHeader } from "@/components/dashboard-header"
 import {
   Card,
@@ -13,57 +14,54 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   TrendingUpIcon,
   TrendingDownIcon,
-  UsersIcon,
-  DollarSignIcon,
-  ActivityIcon,
   ImageIcon,
   VideoIcon,
   SparklesIcon,
   ArrowUpRightIcon,
   ClockIcon,
-  ZapIcon,
   StarIcon,
+  CoinsIcon,
 } from "lucide-react"
 
 /* ─── stat cards data ─── */
 const stats = [
   {
-    title: "Total Revenue",
-    value: "$12,845",
+    title: "Total Gambar",
+    value: "1,245",
     change: "+18.2%",
     trend: "up" as const,
-    icon: DollarSignIcon,
-    description: "vs last month",
+    icon: ImageIcon,
+    description: "vs bulan lalu",
     gradient: "from-violet-500/20 to-purple-500/20",
     iconBg: "bg-violet-500/10 text-violet-500",
   },
   {
-    title: "Active Users",
-    value: "2,340",
+    title: "Total Video",
+    value: "340",
     change: "+12.5%",
     trend: "up" as const,
-    icon: UsersIcon,
-    description: "vs last month",
+    icon: VideoIcon,
+    description: "vs bulan lalu",
     gradient: "from-blue-500/20 to-cyan-500/20",
     iconBg: "bg-blue-500/10 text-blue-500",
   },
   {
-    title: "AI Generations",
-    value: "18,429",
+    title: "Kredit Terpakai",
+    value: "8,429",
     change: "+32.1%",
     trend: "up" as const,
-    icon: SparklesIcon,
-    description: "vs last month",
+    icon: CoinsIcon,
+    description: "vs bulan lalu",
     gradient: "from-amber-500/20 to-orange-500/20",
     iconBg: "bg-amber-500/10 text-amber-500",
   },
   {
-    title: "Conversion Rate",
-    value: "3.24%",
-    change: "-0.8%",
-    trend: "down" as const,
-    icon: ActivityIcon,
-    description: "vs last month",
+    title: "Item di Gallery",
+    value: "1,585",
+    change: "+24.3%",
+    trend: "up" as const,
+    icon: SparklesIcon,
+    description: "vs bulan lalu",
     gradient: "from-emerald-500/20 to-teal-500/20",
     iconBg: "bg-emerald-500/10 text-emerald-500",
   },
@@ -83,29 +81,23 @@ const chartMax = Math.max(...chartData.map((d) => d.images + d.videos))
 
 /* ─── recent activity ─── */
 const recentActivity = [
-  { user: "Sarah Chen", initials: "SC", action: "Generated 12 product images", type: "image" as const, time: "2 min ago", status: "completed" as const },
-  { user: "Alex Rivera", initials: "AR", action: "Created AI video campaign", type: "video" as const, time: "15 min ago", status: "processing" as const },
-  { user: "Maria Kim", initials: "MK", action: "Upgraded to Pro plan", type: "upgrade" as const, time: "1 hr ago", status: "completed" as const },
-  { user: "James Wu", initials: "JW", action: "Batch processed 48 images", type: "image" as const, time: "2 hrs ago", status: "completed" as const },
-  { user: "Lina Patel", initials: "LP", action: "Generated brand video", type: "video" as const, time: "3 hrs ago", status: "completed" as const },
+  { user: "Anda", initials: "ME", action: "Generate 4 gambar dengan AI Image Generator", type: "image" as const, time: "2 menit lalu", status: "completed" as const },
+  { user: "Anda", initials: "ME", action: "Generate video dengan AI Video Generator", type: "video" as const, time: "15 menit lalu", status: "processing" as const },
+  { user: "Anda", initials: "ME", action: "Buat thumbnail YouTube", type: "image" as const, time: "1 jam lalu", status: "completed" as const },
+  { user: "Anda", initials: "ME", action: "Generate foto produk dengan Product Studio", type: "image" as const, time: "2 jam lalu", status: "completed" as const },
+  { user: "Anda", initials: "ME", action: "Buat review produk video", type: "video" as const, time: "3 jam lalu", status: "completed" as const },
 ]
 
 /* ─── top models ─── */
 const topModels = [
-  { name: "Image Gen Pro", usage: 82, requests: "4,291", color: "bg-violet-500" },
-  { name: "Video Creator", usage: 64, requests: "3,180", color: "bg-blue-500" },
-  { name: "Style Transfer", usage: 51, requests: "2,540", color: "bg-cyan-500" },
-  { name: "Background AI", usage: 43, requests: "2,105", color: "bg-amber-500" },
-  { name: "Text-to-Speech", usage: 28, requests: "1,380", color: "bg-emerald-500" },
+  { name: "Imagen 4", usage: 82, requests: "4,291", color: "bg-violet-500" },
+  { name: "Veo 3.1 Fast", usage: 64, requests: "3,180", color: "bg-blue-500" },
+  { name: "Nano Banana Pro", usage: 51, requests: "2,540", color: "bg-cyan-500" },
+  { name: "Nano Banana 2", usage: 43, requests: "2,105", color: "bg-amber-500" },
 ]
 
-/* ─── quick actions ─── */
-const quickActions = [
-  { title: "Generate Image", description: "Create AI images from text prompts", icon: ImageIcon, gradient: "from-violet-500 to-purple-600" },
-  { title: "Create Video", description: "Transform ideas into AI videos", icon: VideoIcon, gradient: "from-blue-500 to-cyan-600" },
-  { title: "AI Assistant", description: "Chat with your AI copilot", icon: SparklesIcon, gradient: "from-amber-500 to-orange-600" },
-  { title: "Boost Speed", description: "Upgrade for faster generation", icon: ZapIcon, gradient: "from-emerald-500 to-teal-600" },
-]
+/* ─── quick actions — from shared constants ─── */
+import { DASHBOARD_FEATURES } from "@/lib/features"
 
 export default function DashboardPage() {
   return (
@@ -124,7 +116,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground text-sm">Welcome back! Here&apos;s an overview of your AI workspace.</p>
+            <p className="text-muted-foreground text-sm">Selamat datang! Berikut ringkasan workspace AI Anda.</p>
           </div>
           <div className="flex items-center gap-2 mt-2 sm:mt-0">
             <Badge variant="outline" className="gap-1.5">
@@ -132,7 +124,7 @@ export default function DashboardPage() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
-              All systems online
+              Semua sistem aktif
             </Badge>
           </div>
         </div>
@@ -173,17 +165,17 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>AI Generations</CardTitle>
-                  <CardDescription>Weekly generation volume by type</CardDescription>
+                  <CardTitle>Generasi AI</CardTitle>
+                  <CardDescription>Volume generasi mingguan berdasarkan tipe</CardDescription>
                 </div>
                 <div className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
-                    Images
+                    Gambar
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                    Videos
+                    Video
                   </div>
                 </div>
               </div>
@@ -214,11 +206,11 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Latest actions across your workspace</CardDescription>
+                  <CardTitle>Aktivitas Terbaru</CardTitle>
+                  <CardDescription>Aksi terakhir di workspace Anda</CardDescription>
                 </div>
                 <button className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                  View all
+                  Lihat semua
                   <ArrowUpRightIcon className="h-3 w-3" />
                 </button>
               </div>
@@ -260,8 +252,8 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Top Models</CardTitle>
-                  <CardDescription>Most used AI models this month</CardDescription>
+                  <CardTitle>Model Teratas</CardTitle>
+                  <CardDescription>Model AI paling sering digunakan bulan ini</CardDescription>
                 </div>
                 <StarIcon className="h-4 w-4 text-amber-500" />
               </div>
@@ -285,24 +277,25 @@ export default function DashboardPage() {
           <Card className="lg:col-span-4 py-5">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Jump into your most used tools</CardDescription>
+              <CardDescription>Langsung masuk ke tools favorit Anda</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
-                {quickActions.map((action) => (
-                  <button
-                    key={action.title}
+                {DASHBOARD_FEATURES.map((feature) => (
+                  <Link
+                    key={feature.title}
+                    href={feature.url}
                     className="group relative flex items-center gap-4 rounded-xl border p-4 text-left transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-muted-foreground/20"
                   >
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${action.gradient} text-white shadow-sm`}>
-                      <action.icon className="h-5 w-5" />
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${feature.gradient} text-white shadow-sm text-lg`}>
+                      {feature.emoji}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold">{action.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{action.description}</p>
+                      <p className="text-sm font-semibold">{feature.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{feature.description}</p>
                     </div>
                     <ArrowUpRightIcon className="ml-auto h-4 w-4 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </button>
+                  </Link>
                 ))}
               </div>
             </CardContent>
