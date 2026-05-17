@@ -123,12 +123,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id;
       }
+      // Fetch role from DB on first sign-in OR when role is missing from existing token
+      if (token.sub && !token.role) {
+        try {
+          const dbUser = await prisma.users.findUnique({
+            where: { id: token.sub },
+            select: { role: true },
+          });
+          token.role = dbUser?.role ?? "user";
+        } catch {
+          token.role = "user";
+        }
+      }
       return token;
     },
 
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
+        session.user.role = (token.role as string) ?? "user";
       }
       return session;
     },

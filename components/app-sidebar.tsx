@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useSession } from "next-auth/react"
 import {
   Sidebar,
   SidebarContent,
@@ -92,10 +93,10 @@ const navItems: NavItem[] = [
     items: [
       { title: "AI Video Generator", url: "/dashboard/tools/ai-video-generator" },
       { title: "Review Product", url: "/dashboard/review-product" },
-      { title: "Storyboard", url: "/dashboard/storyboard" },
-      { title: "Scene Builder", url: "/dashboard/scene-builder" },
-      { title: "Video Template", url: "/dashboard/video-template" },
-      { title: "TikTok Hook Generator", url: "/dashboard/tiktok-hook-gen" },
+      // { title: "Storyboard", url: "/dashboard/storyboard" },
+      // { title: "Scene Builder", url: "/dashboard/scene-builder" },
+      // { title: "Video Template", url: "/dashboard/video-template" },
+      // { title: "TikTok Hook Generator", url: "/dashboard/tiktok-hook-gen" },
       // { title: "Extend Video", url: "/dashboard/extend-video" },
       // { title: "Merge Videos", url: "/dashboard/concatenate-video" },
       // { title: "Motion Control", url: "/dashboard/motion-control" },
@@ -105,36 +106,36 @@ const navItems: NavItem[] = [
   },
 
   // ── Single links (bottom section) ──
-  {
-    title: "Chat AI",
-    url: "/dashboard/chat",
-    icon: <MessageSquareIcon className="h-4 w-4" />,
-    type: "link",
-  },
-  {
-    title: "Buy Credits",
-    url: "/dashboard/buy-credits",
-    icon: <CoinsIcon className="h-4 w-4" />,
-    type: "link",
-  },
-  {
-    title: "Gallery",
-    url: "/dashboard/gallery",
-    icon: <GalleryHorizontalEndIcon className="h-4 w-4" />,
-    type: "link",
-  },
-  {
-    title: "API Keys",
-    url: "/dashboard/api-keys",
-    icon: <KeyRoundIcon className="h-4 w-4" />,
-    type: "link",
-  },
-  {
-    title: "API Docs",
-    url: "/dashboard/api-docs",
-    icon: <FileTextIcon className="h-4 w-4" />,
-    type: "link",
-  },
+  // {
+  //   title: "Chat AI",
+  //   url: "/dashboard/chat",
+  //   icon: <MessageSquareIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
+  // {
+  //   title: "Buy Credits",
+  //   url: "/dashboard/buy-credits",
+  //   icon: <CoinsIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
+  // {
+  //   title: "Gallery",
+  //   url: "/dashboard/gallery",
+  //   icon: <GalleryHorizontalEndIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
+  // {
+  //   title: "API Keys",
+  //   url: "/dashboard/api-keys",
+  //   icon: <KeyRoundIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
+  // {
+  //   title: "API Docs",
+  //   url: "/dashboard/api-docs",
+  //   icon: <FileTextIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
   {
     title: "Admin Panel",
     url: "/dashboard/admin",
@@ -145,6 +146,16 @@ const navItems: NavItem[] = [
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role ?? "user"
+  const isAdmin = userRole === "admin"
+
+  // Filter out adminOnly items for non-admin users
+  const filteredItems = React.useMemo(
+    () => navItems.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin]
+  )
+
   return (
     <Sidebar collapsible="icon" {...props}>
       {/* ── Header: Logo + Brand ── */}
@@ -175,7 +186,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       {/* ── Content: Navigation ── */}
       <SidebarContent>
-        <NavMain items={navItems} />
+        <NavMain items={filteredItems} />
       </SidebarContent>
 
       {/* ── Footer: User dropdown ── */}
