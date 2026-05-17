@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model accounts {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model api_keys {
+  id           String      @id
+  userId       String
+  key          String      @unique
+  name         String
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime
+  description  String?
+  expiresAt    DateTime?
+  keyPrefix    String
+  lastUsedAt   DateTime?
+  permissions  String[]    @default([])
+  rateLimit    Int         @default(100)
+  requestCount Int         @default(0)
+  users        users       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  api_usage    api_usage[]
+
+  @@index([keyPrefix])
+  @@index([key])
+  @@index([userId])
+}
+
+model api_usage {
+  id           String   @id
+  apiKeyId     String
+  endpoint     String
+  method       String
+  statusCode   Int
+  responseTime Int
+  ipAddress    String?
+  userAgent    String?
+  requestBody  String?
+  errorMessage String?
+  creditsUsed  Int      @default(0)
+  createdAt    DateTime @default(now())
+  api_keys     api_keys @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt(sort: Desc)])
+  @@index([apiKeyId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model credit_costs {
+  id          String   @id
+  feature     String   @unique
+  creditCost  Float
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model credit_packages {
+  id              String   @id
+  name            String
+  credits         Int
+  price           Int
+  bonusCredits    Int      @default(0)
+  discountPercent Int      @default(0)
+  description     String?
+  isActive        Boolean  @default(true)
+  isPopular       Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([isActive])
+}
+
+model credit_transactions {
+  id          String   @id
+  userId      String
+  type        String
+  amount      Int
+  balance     Int
+  description String
+  feature     String?
+  referenceId String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  resellerId  String?
+  users       users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([resellerId])
+  @@index([type])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model gallery_items {
+  id                String   @id
+  userId            String
+  type              String   @default("image")
+  gcsPath           String   @unique
+  gcsUrl            String
+  mediaGenerationId String?
+  prompt            String?
+  model             String?
+  aspectRatio       String?
+  filename          String?
+  contentType       String?
+  fileSize          Int?
+  width             Int?
+  height            Int?
+  visibility        String   @default("private")
+  sourceAction      String?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  users             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, visibility])
+  @@index([visibility, createdAt(sort: Desc)])
+}
+
+model referrals {
+  id         String   @id
+  referrerId String
+  referredId String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  reward     Int      @default(0)
+  users      users    @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+}
+
+model reseller_credit_packages {
+  id           String    @id
+  resellerId   String
+  name         String
+  credits      Int
+  price        Int
+  bonusCredits Int       @default(0)
+  description  String?
+  isActive     Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  resellers    resellers @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@index([resellerId])
+}
+
+model reseller_transactions {
+  id           String    @id
+  resellerId   String
+  type         String
+  credits      Int
+  amount       Int
+  balanceAfter Int
+  description  String
+  referenceId  String?
+  metadata     String?
+  createdAt    DateTime  @default(now())
+  resellers    resellers @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([resellerId, createdAt(sort: Desc)])
+  @@index([resellerId])
+  @@index([type])
+}
+
+model reseller_withdrawals {
+  id          String    @id
+  resellerId  String
+  amount      Int
+  status      String    @default("pending")
+  bankName    String
+  bankAccount String
+  accountName String
+  notes       String?
+  adminNotes  String?
+  processedAt DateTime?
+  processedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  resellers   resellers @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([resellerId])
+  @@index([status])
+}
+
+model resellers {
+  id                                String                     @id
+  userId                            String                     @unique
+  brandName                         String
+  slug                              String                     @unique
+  customDomain                      String?                    @unique
+  logo                              String?
+  favicon                           String?
+  primaryColor                      String                     @default("#6366f1")
+  secondaryColor                    String                     @default("#8b5cf6")
+  description                       String?
+  creditBalance                     Int                        @default(0)
+  marginPercent                     Int                        @default(30)
+  isActive                          Boolean                    @default(true)
+  isVerified                        Boolean                    @default(false)
+  createdAt                         DateTime                   @default(now())
+  updatedAt                         DateTime
+  enabledFeatures                   String[]                   @default(["image-generator", "video-generator", "audio-studio", "model-studio", "product-studio", "review-product", "scene-builder", "poster", "thumbnail", "video-template", "tiktok-hook-gen", "chat"])
+  accountName                       String?
+  availableBalance                  Int                        @default(0)
+  bankAccount                       String?
+  bankName                          String?
+  registrationPaid                  Boolean                    @default(false)
+  totalEarnings                     Int                        @default(0)
+  withdrawnAmount                   Int                        @default(0)
+  reseller_credit_packages          reseller_credit_packages[]
+  reseller_transactions             reseller_transactions[]
+  reseller_withdrawals              reseller_withdrawals[]
+  users_resellers_userIdTousers     users                      @relation("resellers_userIdTousers", fields: [userId], references: [id], onDelete: Cascade)
+  users_users_resellerIdToresellers users[]                    @relation("users_resellerIdToresellers")
+
+  @@index([customDomain])
+  @@index([isActive])
+  @@index([slug])
+}
+
+model sessions {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  deviceId     String?
+  lastActive   DateTime @default(now())
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model settings {
+  id        String   @id
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
+
+model subscription_plans {
+  id              String          @id
+  name            String
+  price           Int
+  duration        Int
+  features        String[]
+  isActive        Boolean         @default(true)
+  isPopular       Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  discountPercent Int             @default(0)
+  subscriptions   subscriptions[]
+}
+
+model subscriptions {
+  id                 String              @id
+  userId             String              @unique
+  planId             String?
+  plan               String
+  status             String              @default("active")
+  startDate          DateTime            @default(now())
+  endDate            DateTime
+  price              Int
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime
+  subscription_plans subscription_plans? @relation(fields: [planId], references: [id])
+  users              users               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+}
+
+model transactions {
+  id               String   @id
+  userId           String
+  orderId          String   @unique
+  plan             String
+  amount           Int
+  status           String   @default("pending")
+  paymentType      String?
+  transactionId    String?
+  midtransToken    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
+  fraudStatus      String?
+  midtransResponse String?
+  resellerId       String?
+  users            users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([resellerId])
+  @@index([status])
+  @@index([userId])
+}
+
+model upscale_items {
+  id                  String   @id
+  userId              String
+  sourceGalleryItemId String?
+  mediaGenerationId   String?
+  resolution          String   @default("2k")
+  gcsPath             String   @unique
+  gcsUrl              String
+  prompt              String?
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+  users               users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model usage_stats {
+  id           String   @id
+  userId       String
+  feature      String
+  requestCount Int      @default(0)
+  successCount Int      @default(0)
+  failureCount Int      @default(0)
+  date         DateTime @default(now())
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, date])
+}
+
+model user_assets {
+  id                String   @id
+  userId            String
+  mediaGenerationId String
+  name              String?
+  thumbnailUrl      String?
+  type              String   @default("image")
+  width             Int?
+  height            Int?
+  fileSize          Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  users             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model user_credits {
+  id        String   @id
+  userId    String   @unique
+  balance   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model users {
+  id                                    String                @id
+  name                                  String?
+  email                                 String                @unique
+  emailVerified                         DateTime?
+  password                              String?
+  image                                 String?
+  createdAt                             DateTime              @default(now())
+  updatedAt                             DateTime
+  role                                  String                @default("user")
+  discountPercent                       Int                   @default(0)
+  referralCode                          String?               @unique
+  referredBy                            String?
+  hasUsedTrial                          Boolean               @default(false)
+  referralEarnings                      Int                   @default(0)
+  lastFreeCreditClaim                   DateTime?
+  isReseller                            Boolean               @default(false)
+  resellerId                            String?
+  accounts                              accounts[]
+  api_keys                              api_keys[]
+  credit_transactions                   credit_transactions[]
+  gallery_items                         gallery_items[]
+  referrals                             referrals[]
+  resellers_resellers_userIdTousers     resellers?            @relation("resellers_userIdTousers")
+  sessions                              sessions[]
+  subscriptions                         subscriptions?
+  transactions                          transactions[]
+  upscale_items                         upscale_items[]
+  usage_stats                           usage_stats[]
+  user_assets                           user_assets[]
+  user_credits                          user_credits?
+  resellers_users_resellerIdToresellers resellers?            @relation("users_resellerIdToresellers", fields: [resellerId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([resellerId])
+  @@index([role])
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
