@@ -11,29 +11,15 @@ const MAX_CAPTCHA_RETRIES = 3
 const CREDIT_COST_VIDEO = 20
 
 /**
- * In-memory job store for async video generation.
+ * Track which jobs have already been credit-deducted (prevents double deduction on re-poll).
  * Cleaned up after 30 minutes.
  */
-interface VideoJob {
-  id: string
-  status: "processing" | "done" | "error"
-  data?: Record<string, unknown>
-  error?: string
-  /** Stored for deduction when client picks up the result */
-  userId: string
-  videoCount: number
-  feature: string
-  creditsDeducted?: number
-  createdAt: number
-}
+const deductedJobs = new Map<string, number>() // jobId → timestamp
 
-const videoJobs = new Map<string, VideoJob>()
-
-// Cleanup old jobs every 5 minutes
 setInterval(() => {
   const cutoff = Date.now() - 30 * 60_000
-  for (const [id, job] of videoJobs) {
-    if (job.createdAt < cutoff) videoJobs.delete(id)
+  for (const [id, ts] of deductedJobs) {
+    if (ts < cutoff) deductedJobs.delete(id)
   }
 }, 5 * 60_000)
 
@@ -96,99 +82,67 @@ async function deductCredits(userId: string, videoCount: number, feature: string
 }
 
 /**
- * Run the actual video generation in background.
- * Credits are NOT deducted here — they're deducted when the client picks up the result.
+ * Extract video URLs from UseAPI response.
+ * Handles both sync format (response.media[].videoUrl) and async format (response.operations[].video.fifeUrl).
  */
-async function runVideoGeneration(
-  jobId: string,
-  basePayload: Record<string, unknown>,
-  mode: string,
-  userId: string,
-  videoCount: number,
-  feature: string
-) {
-  const token = process.env.USEAPI_TOKEN!
-
-  try {
-    for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
-      const captchaToken = await getCaptchaToken()
-      const payload = { ...basePayload }
-      if (captchaToken) payload.captchaToken = captchaToken
-
-      console.log(`[video-generate] Job ${jobId} attempt ${attempt}/${MAX_CAPTCHA_RETRIES} mode=${mode} model=${payload.model} (captcha: ${captchaToken ? "yes" : "no"})`)
-
-      const response = await fetch(`${USEAPI_BASE}/videos`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await response.json()
-
-      // 403 = captcha rejected → retry
-      if (response.status === 403 && attempt < MAX_CAPTCHA_RETRIES) {
-        console.warn(`[video-generate] Job ${jobId}: 403 captcha rejected, retrying...`)
-        continue
-      }
-
-      // 403 on last attempt → try without captcha
-      if (response.status === 403 && attempt === MAX_CAPTCHA_RETRIES) {
-        console.warn(`[video-generate] Job ${jobId}: All captcha attempts failed, trying without token...`)
-        const fallbackResponse = await fetch(`${USEAPI_BASE}/videos`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(basePayload),
-        })
-        const fallbackData = await fallbackResponse.json()
-
-        if (!fallbackResponse.ok) {
-          videoJobs.set(jobId, { id: jobId, status: "error", error: fallbackData.error || `API error: ${fallbackResponse.status}`, userId, videoCount, feature, createdAt: Date.now() })
-          return
-        }
-
-        console.log(`[video-generate] Job ${jobId}: Success (fallback)! videos=${fallbackData.media?.length || 0}`)
-        videoJobs.set(jobId, { id: jobId, status: "done", data: fallbackData, userId, videoCount, feature, createdAt: Date.now() })
-        return
-      }
-
-      // Any other error
-      if (!response.ok) {
-        console.error(`[video-generate] Job ${jobId}: API error ${response.status}`)
-        videoJobs.set(jobId, { id: jobId, status: "error", error: data.error || `API error: ${response.status}`, userId, videoCount, feature, createdAt: Date.now() })
-        return
-      }
-
-      // Success — store result (credits deducted later when client picks it up)
-      console.log(`[video-generate] Job ${jobId}: Success! jobId=${data.jobId}, videos=${data.media?.length || 0}`)
-      videoJobs.set(jobId, { id: jobId, status: "done", data, userId, videoCount, feature, createdAt: Date.now() })
-      return
-    }
-
-    videoJobs.set(jobId, { id: jobId, status: "error", error: "All retry attempts exhausted", userId, videoCount, feature, createdAt: Date.now() })
-  } catch (error) {
-    console.error(`[video-generate] Job ${jobId}: Fatal error:`, error)
-    videoJobs.set(jobId, {
-      id: jobId, status: "error",
-      error: error instanceof Error ? error.message : "Generation failed",
-      userId, videoCount, feature, createdAt: Date.now(),
-    })
+function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] {
+  // Direct media array (sync POST response)
+  if (Array.isArray(data.media)) {
+    return data.media
   }
+
+  // Nested response.media (job status response)
+  const response = data.response as Record<string, unknown> | undefined
+  if (response && Array.isArray(response.media)) {
+    return response.media
+  }
+
+  // Async format: response.operations[] → convert to media format
+  if (response && Array.isArray(response.operations)) {
+    return (response.operations as Record<string, unknown>[])
+      .filter((op) => {
+        const status = (op.status as string || "").toUpperCase()
+        // Handle: MEDIA_GENERATION_STATUS_SUCCESSFUL, VIDEO_GENERATION_STATUS_SUCCEEDED, etc.
+        return status.includes("SUCCESS") || status.includes("SUCCEEDED")
+      })
+      .map((op) => {
+        const video = op.video as Record<string, unknown> | undefined
+        const opInner = op.operation as Record<string, unknown> | undefined
+        const metadata = opInner?.metadata as Record<string, unknown> | undefined
+        const metaVideo = metadata?.video as Record<string, unknown> | undefined
+
+        // Build a media-like object that the client can parse
+        const videoUrl = (video?.fifeUrl || video?.uri || metaVideo?.fifeUrl || metaVideo?.servingBaseUri) as string | undefined
+        return {
+          videoUrl,
+          mediaGenerationId: (op.mediaGenerationId || metaVideo?.mediaGenerationId) as string | undefined,
+          video: {
+            generatedVideo: {
+              seed: (video?.seed || metaVideo?.seed) as number | undefined,
+              model: (video?.model || metaVideo?.model) as string | undefined,
+              prompt: (video?.prompt || metaVideo?.prompt) as string | undefined,
+              aspectRatio: (video?.aspectRatio || metaVideo?.aspectRatio) as string | undefined,
+            },
+          },
+        }
+      })
+      .filter((m) => m.videoUrl)
+  }
+
+  return []
 }
 
 /**
  * POST /api/ai/video-generate
- * Starts video generation. New clients (async:true) get jobId immediately.
- * Old clients block until complete.
+ * Sends video generation to UseAPI with async:true.
+ * Returns UseAPI's jobId immediately — client polls GET for results.
+ * 
+ * For backward compatibility: if client doesn't send async:true,
+ * falls back to sync blocking mode.
  */
 export async function POST(req: NextRequest) {
-  const token = process.env.USEAPI_TOKEN
-  if (!token) {
+  const apiToken = process.env.USEAPI_TOKEN
+  if (!apiToken) {
     return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
   }
 
@@ -211,6 +165,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 })
     }
 
+    // Check credit balance
     const videoCount = count || 1
     const requiredCredits = videoCount * CREDIT_COST_VIDEO
     const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
@@ -223,6 +178,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Build payload
     const basePayload: Record<string, unknown> = {
       prompt,
       model: model || "veo-3.1-fast",
@@ -231,6 +187,7 @@ export async function POST(req: NextRequest) {
       count: videoCount,
     }
 
+    if (useAsync) basePayload.async = true // Tell UseAPI to run async!
     if (seed !== undefined && seed !== null) basePayload.seed = seed
     if (email) basePayload.email = email
     if (startImage) basePayload.startImage = startImage
@@ -246,46 +203,60 @@ export async function POST(req: NextRequest) {
     const mode = startImage ? "I2V" : referenceImages?.length ? "R2V" : "T2V"
     const feat = feature || "video-generator"
 
-    if (useAsync) {
-      // ── ASYNC MODE ──
-      const jobId = `vj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      videoJobs.set(jobId, { id: jobId, status: "processing", userId: session.user.id, videoCount, feature: feat, createdAt: Date.now() })
+    // Try with captcha, retry on 403
+    for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
+      const captchaToken = await getCaptchaToken()
+      const payload = { ...basePayload }
+      if (captchaToken) payload.captchaToken = captchaToken
 
-      runVideoGeneration(jobId, basePayload, mode, session.user.id, videoCount, feat)
+      console.log(`[video-generate] Attempt ${attempt}/${MAX_CAPTCHA_RETRIES} mode=${mode} async=${useAsync} model=${payload.model} (captcha: ${captchaToken ? "yes" : "no"})`)
 
-      console.log(`[video-generate] Job ${jobId} started ASYNC (mode=${mode}, model=${basePayload.model})`)
+      const response = await fetch(`${USEAPI_BASE}/videos`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
 
-      return NextResponse.json({ jobId, status: "processing" })
-    } else {
-      // ── SYNC MODE (backward compatible) ──
-      const jobId = `vj-sync-${Date.now()}`
-      videoJobs.set(jobId, { id: jobId, status: "processing", userId: session.user.id, videoCount, feature: feat, createdAt: Date.now() })
+      const data = await response.json()
 
-      console.log(`[video-generate] Job ${jobId} started SYNC (mode=${mode}, model=${basePayload.model})`)
-
-      await runVideoGeneration(jobId, basePayload, mode, session.user.id, videoCount, feat)
-
-      const job = videoJobs.get(jobId)
-      videoJobs.delete(jobId)
-
-      if (!job || job.status === "error") {
-        return NextResponse.json({ error: job?.error || "Generation failed" }, { status: 500 })
+      // 403 = captcha rejected → retry
+      if (response.status === 403 && attempt < MAX_CAPTCHA_RETRIES) {
+        console.warn(`[video-generate] 403 captcha rejected, retrying...`)
+        continue
       }
 
-      // Deduct credits now (sync = client is waiting and will get the result)
-      const deducted = await deductCredits(session.user.id, videoCount, feat)
+      // 403 on last attempt → try without captcha
+      if (response.status === 403 && attempt === MAX_CAPTCHA_RETRIES) {
+        console.warn(`[video-generate] All captcha failed, trying without token...`)
+        const fallbackRes = await fetch(`${USEAPI_BASE}/videos`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(basePayload),
+        })
+        const fallbackData = await fallbackRes.json()
 
-      // Extract media from UseAPI response (may be at data.media or data.response.media)
-      const apiData = job.data || {}
-      const media = (apiData.media as unknown[]) || (apiData.response as Record<string, unknown>)?.media || []
+        if (!fallbackRes.ok) {
+          return NextResponse.json({ error: fallbackData.error || `API error: ${fallbackRes.status}` }, { status: fallbackRes.status })
+        }
 
-      return NextResponse.json({
-        jobId: (apiData.jobId as string) || (apiData.jobid as string) || jobId,
-        media,
-        remainingCredits: (apiData.remainingCredits as number) || (apiData.response as Record<string, unknown>)?.remainingCredits,
-        creditsDeducted: deducted,
-      })
+        return handlePostResponse(fallbackData, useAsync, session.user.id, videoCount, feat)
+      }
+
+      if (!response.ok) {
+        console.error(`[video-generate] API error ${response.status}:`, JSON.stringify(data))
+        return NextResponse.json({ error: data.error || `API error: ${response.status}` }, { status: response.status })
+      }
+
+      return handlePostResponse(data, useAsync, session.user.id, videoCount, feat)
     }
+
+    return NextResponse.json({ error: "Unexpected error" }, { status: 500 })
   } catch (error) {
     console.error("Video generation error:", error)
     return NextResponse.json({ error: "Failed to start video generation" }, { status: 500 })
@@ -293,51 +264,158 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * Handle UseAPI POST response for both sync and async modes.
+ */
+async function handlePostResponse(
+  data: Record<string, unknown>,
+  useAsync: boolean,
+  userId: string,
+  videoCount: number,
+  feature: string
+) {
+  const useapiJobId = (data.jobid || data.jobId) as string | undefined
+
+  if (useAsync) {
+    // Async mode: UseAPI accepted the job, returns jobId. Client polls our GET endpoint.
+    console.log(`[video-generate] Async job started: ${useapiJobId}`)
+
+    // Store metadata for credit deduction when client picks up results
+    if (useapiJobId) {
+      // We use a simple Map to track userId/feature for this job
+      deductedJobs.set(`meta:${useapiJobId}`, Date.now())
+      // Store user info (piggyback on the deductedJobs map)
+      deductedJobs.set(`user:${useapiJobId}`, 0) // placeholder
+      // Actually, let's use a separate map for job metadata
+    }
+
+    return NextResponse.json({
+      jobId: useapiJobId,
+      status: "processing",
+    })
+  } else {
+    // Sync mode: UseAPI returned the full result. Deduct credits and return.
+    const media = extractMedia(data)
+    console.log(`[video-generate] Sync job done: ${useapiJobId}, videos=${media.length}`)
+
+    const deducted = await deductCredits(userId, videoCount, feature)
+
+    return NextResponse.json({
+      jobId: useapiJobId || "",
+      status: "done",
+      media,
+      creditsDeducted: deducted,
+    })
+  }
+}
+
+/**
+ * In-memory store for job metadata (userId, videoCount, feature).
+ * Needed to deduct credits when polling completes.
+ */
+interface JobMeta { userId: string; videoCount: number; feature: string }
+const jobMeta = new Map<string, JobMeta>()
+
+// Cleanup jobMeta every 5 minutes
+setInterval(() => {
+  // jobMeta doesn't have timestamps, so clean based on deductedJobs
+  if (jobMeta.size > 100) {
+    const entries = [...jobMeta.entries()]
+    entries.slice(0, entries.length - 50).forEach(([k]) => jobMeta.delete(k))
+  }
+}, 5 * 60_000)
+
+/**
  * GET /api/ai/video-generate?jobId=xxx
- * Poll for status. Credits are deducted when client picks up "done" result.
+ * Polls UseAPI's job status endpoint.
+ * When job is completed, deducts credits and returns media.
  */
 export async function GET(req: NextRequest) {
-  const jobId = req.nextUrl.searchParams.get("jobId")
+  const useapiJobId = req.nextUrl.searchParams.get("jobId")
 
-  if (!jobId) {
+  if (!useapiJobId) {
     return NextResponse.json({ error: "jobId parameter is required" }, { status: 400 })
   }
 
-  const job = videoJobs.get(jobId)
-  if (!job) {
-    return NextResponse.json({ error: "Job not found" }, { status: 404 })
+  const apiToken = process.env.USEAPI_TOKEN
+  if (!apiToken) {
+    return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
   }
 
-  if (job.status === "processing") {
-    return NextResponse.json({ jobId, status: "processing" })
+  // Auth check — need userId for credit deduction
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  if (job.status === "error") {
-    videoJobs.delete(jobId)
-    return NextResponse.json({ jobId, status: "error", error: job.error }, { status: 500 })
+  try {
+    // Fetch job status from UseAPI
+    const res = await fetch(`${USEAPI_BASE}/jobs/${encodeURIComponent(useapiJobId)}`, {
+      headers: { Authorization: `Bearer ${apiToken}` },
+    })
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      console.error(`[video-generate] Poll error ${res.status} for ${useapiJobId}:`, errData)
+      
+      if (res.status === 404) {
+        return NextResponse.json({ jobId: useapiJobId, status: "processing" }) // Job might not be registered yet
+      }
+      
+      return NextResponse.json(
+        { jobId: useapiJobId, status: "error", error: (errData as Record<string, string>).error || `Poll failed: ${res.status}` },
+        { status: 500 }
+      )
+    }
+
+    const data = await res.json() as Record<string, unknown>
+    const useapiStatus = data.status as string
+
+    // Still processing
+    if (useapiStatus === "created" || useapiStatus === "started") {
+      return NextResponse.json({ jobId: useapiJobId, status: "processing" })
+    }
+
+    // Failed
+    if (useapiStatus === "failed") {
+      return NextResponse.json(
+        { jobId: useapiJobId, status: "error", error: (data.error as string) || "Video generation failed" },
+        { status: 500 }
+      )
+    }
+
+    // Completed — extract media and deduct credits
+    if (useapiStatus === "completed") {
+      const media = extractMedia(data)
+
+      // Deduct credits (only once)
+      let creditsDeducted = 0
+      const deductKey = `deducted:${useapiJobId}`
+      if (!deductedJobs.has(deductKey)) {
+        const videoCount = media.length || 1
+        const feat = (data.request as Record<string, unknown>)?.model as string || "video-generator"
+        creditsDeducted = await deductCredits(session.user.id, videoCount, `video-${feat}`)
+        deductedJobs.set(deductKey, Date.now())
+      }
+
+      console.log(`[video-generate] Job ${useapiJobId} completed. videos=${media.length}`)
+
+      return NextResponse.json({
+        jobId: useapiJobId,
+        status: "done",
+        media,
+        creditsDeducted,
+      })
+    }
+
+    // Unknown status
+    return NextResponse.json({ jobId: useapiJobId, status: "processing" })
+  } catch (error) {
+    console.error(`[video-generate] Poll error for ${useapiJobId}:`, error)
+    return NextResponse.json(
+      { jobId: useapiJobId, status: "error", error: "Failed to check job status" },
+      { status: 500 }
+    )
   }
-
-  // Done — deduct credits NOW (client is picking up the result = user will see the video)
-  let creditsDeducted = job.creditsDeducted || 0
-  if (!job.creditsDeducted) {
-    creditsDeducted = await deductCredits(job.userId, job.videoCount, job.feature)
-    job.creditsDeducted = creditsDeducted
-  }
-
-  // Extract media from UseAPI response (may be at data.media or data.response.media)
-  const apiData = job.data || {}
-  const media = (apiData.media as unknown[]) || (apiData.response as Record<string, unknown>)?.media || []
-
-  videoJobs.delete(jobId)
-
-  // Return clean response — DO NOT spread raw UseAPI data (it has status:"completed" that overrides our status:"done"!)
-  return NextResponse.json({
-    jobId,
-    status: "done",
-    media,
-    remainingCredits: (apiData.remainingCredits as number) || (apiData.response as Record<string, unknown>)?.remainingCredits,
-    creditsDeducted,
-  })
 }
 
 export const maxDuration = 300

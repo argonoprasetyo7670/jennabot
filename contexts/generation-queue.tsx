@@ -391,8 +391,10 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
   // Resume polling for video jobs that were processing before refresh
   React.useEffect(() => {
     const store = getStore()
+    // Resume polling for video jobs that were still processing
+    // UseAPI jobIds start with "j" (e.g. j0517...v-u2232-...)
     const processingVideoJobs = store.jobs.filter(
-      (j) => j.type === "video" && (j.status === "uploading" || j.status === "generating") && j.id.startsWith("vj-")
+      (j) => j.type === "video" && (j.status === "uploading" || j.status === "generating")
     )
 
     for (const job of processingVideoJobs) {
@@ -465,9 +467,9 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
       })()
     }
 
-    // Mark non-resumable processing jobs (image jobs, custom jobs) as interrupted
+    // Mark non-resumable processing jobs (image/custom jobs only) as interrupted
     const nonResumable = store.jobs.filter(
-      (j) => (j.status === "uploading" || j.status === "generating") && !j.id.startsWith("vj-")
+      (j) => j.type !== "video" && (j.status === "uploading" || j.status === "generating")
     )
     for (const job of nonResumable) {
       updateJobInStore(job.id, {
