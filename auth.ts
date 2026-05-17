@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   // No adapter — we handle user creation manually via signIn callback
   session: {
     strategy: "jwt",
