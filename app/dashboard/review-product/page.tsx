@@ -224,9 +224,12 @@ export default function ReviewProductPage() {
       const vid = vidResult.videos[0]
       if (!vid || !vid.url) throw new Error("Gagal membuat video — tidak ada URL video di response")
       
-      // Proxy video URL to avoid CORS issues
-      const proxiedUrl = `/api/ai/video-download?url=${encodeURIComponent(vid.url)}&filename=review-video.mp4`
-      setGeneratedVideo({ ...vid, url: vid.url, proxyUrl: proxiedUrl } as GeneratedVideo & { proxyUrl?: string })
+      // vid.url is already proxied by generateVideos() for playback
+      // Use rawUrl for download link
+      const downloadUrl = vid.rawUrl
+        ? `/api/ai/video-download?url=${encodeURIComponent(vid.rawUrl)}&filename=review-video.mp4&mode=attachment`
+        : vid.url
+      setGeneratedVideo({ ...vid, proxyUrl: vid.url, downloadUrl } as GeneratedVideo & { proxyUrl?: string; downloadUrl?: string })
 
       // Deduct image credits only (video credits handled server-side)
       await fetch("/api/credits", {
