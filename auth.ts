@@ -7,6 +7,7 @@ import crypto from "crypto";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   // No adapter — we handle user creation manually via signIn callback
   session: {
     strategy: "jwt",
@@ -27,7 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required");
+          return null;
         }
 
         const user = await prisma.users.findUnique({
@@ -35,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         if (!user || !user.password) {
-          throw new Error("Invalid email or password");
+          return null;
         }
 
         const isValid = await bcrypt.compare(
@@ -44,7 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
 
         if (!isValid) {
-          throw new Error("Invalid email or password");
+          return null;
         }
 
         return {
