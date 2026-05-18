@@ -362,7 +362,7 @@ export default function AIVideoGeneratorPage() {
             />
 
             <div className="mb-1 flex shrink-0 items-center gap-1.5">
-              <div className="relative">
+              <div className="relative" ref={settingsRef}>
                 {/* Mobile: gear icon only */}
                 <button onClick={() => setShowSettings(!showSettings)} className="sm:hidden flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground cursor-pointer transition-all hover:bg-muted">
                   <Settings2Icon className="h-4 w-4" />
@@ -378,7 +378,7 @@ export default function AIVideoGeneratorPage() {
                 {/* Mobile: bottom sheet overlay */}
                 {showSettings && (
                   <div className="sm:hidden fixed inset-0 z-50 flex items-end bg-black/40 backdrop-blur-sm" onClick={() => setShowSettings(false)}>
-                    <div ref={settingsRef} className="w-full rounded-t-2xl border-t border-border bg-card p-4 pb-6 shadow-2xl animate-fade-up" onClick={(e) => e.stopPropagation()}>
+                    <div className="w-full rounded-t-2xl border-t border-border bg-card p-4 pb-6 shadow-2xl animate-fade-up" onClick={(e) => e.stopPropagation()}>
                       {/* Drag handle */}
                       <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/20" />
 
@@ -422,7 +422,7 @@ export default function AIVideoGeneratorPage() {
 
                 {/* Desktop: floating popup */}
                 {showSettings && (
-                  <div ref={settingsRef} className="hidden sm:block absolute bottom-full right-0 mb-2 w-[320px] z-50">
+                  <div className="hidden sm:block absolute bottom-full right-0 mb-2 w-[320px] z-50">
                     <div className="rounded-2xl border border-border bg-card/95 p-3 backdrop-blur-xl shadow-2xl">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Rasio Aspek</p>
                       <div className="flex gap-1.5 mb-3">
