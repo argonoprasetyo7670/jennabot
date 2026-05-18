@@ -12,7 +12,8 @@ export default function AuthForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    await fetch("/api/auth/clear", { method: "POST" }).catch(() => null);
     signIn("google", { callbackUrl: "/dashboard" });
   };
 
