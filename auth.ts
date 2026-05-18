@@ -5,9 +5,19 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+
+if (
+  process.env.AUTH_SECRET &&
+  process.env.NEXTAUTH_SECRET &&
+  process.env.AUTH_SECRET !== process.env.NEXTAUTH_SECRET
+) {
+  throw new Error("AUTH_SECRET and NEXTAUTH_SECRET must be identical");
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: authSecret,
   // No adapter — we handle user creation manually via signIn callback
   session: {
     strategy: "jwt",
@@ -19,6 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      checks: ["state"],
     }),
     Credentials({
       name: "credentials",
