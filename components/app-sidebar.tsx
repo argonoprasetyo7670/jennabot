@@ -125,6 +125,12 @@ const navItems: NavItem[] = [
     type: "link",
   },
   // {
+  //   title: "Workflow Builder",
+  //   url: "/dashboard/workflow",
+  //   icon: <GitMergeIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
+  // {
   //   title: "API Keys",
   //   url: "/dashboard/api-keys",
   //   icon: <KeyRoundIcon className="h-4 w-4" />,

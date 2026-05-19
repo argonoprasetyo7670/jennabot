@@ -433,6 +433,66 @@ html.light .marquee-track span { color: rgba(var(--fg-rgb), 0.15) !important; }
   --sidebar-ring: oklch(0.547 0.021 43.1);
 }
 
+/* ===== WORKFLOW BUILDER ===== */
+.workflow-node {
+  transition: all 0.3s ease;
+}
+.workflow-node.running {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  animation: node-pulse 2s ease-in-out infinite;
+}
+.workflow-node.done { border-color: var(--emerald); }
+.workflow-node.error { border-color: #ef4444; }
+@keyframes node-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+}
+
+/* ReactFlow overrides for dark theme */
+.workflow-canvas .react-flow__node { cursor: grab; }
+.workflow-canvas .react-flow__node:active { cursor: grabbing; }
+.workflow-canvas .react-flow__controls {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-card) !important;
+}
+.workflow-canvas .react-flow__controls button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text-2) !important;
+  fill: var(--text-2) !important;
+  width: 32px !important;
+  height: 32px !important;
+}
+.workflow-canvas .react-flow__controls button:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-1) !important;
+  fill: var(--text-1) !important;
+}
+.workflow-canvas .react-flow__controls button:last-child {
+  border-bottom: none !important;
+}
+.workflow-canvas .react-flow__controls button svg {
+  fill: inherit !important;
+}
+.workflow-minimap {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.workflow-canvas .react-flow__edge-path { stroke-width: 2; }
+.workflow-canvas .react-flow__handle {
+  border: 2px solid var(--bg) !important;
+  transition: transform 0.2s ease;
+}
+.workflow-canvas .react-flow__handle:hover {
+  transform: scale(1.4);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
