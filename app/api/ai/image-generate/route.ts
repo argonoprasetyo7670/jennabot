@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/auth"
+import { CREDIT_COST_IMAGE, deductCredits, refundCredits } from "@/lib/credit-guard"
 
 const USEAPI_BASE = "https://api.useapi.net/v1/google-flow"
 const CAPTCHA_BROKER_URL = process.env.CAPTCHA_BROKER_URL || "http://localhost:4000"
@@ -34,6 +36,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
   }
 
+  // ── Auth check ──
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   try {
     const body = await req.json()
     const { prompt, model, aspectRatio, count, seed, references, email } = body
@@ -42,12 +50,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 })
     }
 
+    // ── Credit check & pre-deduct ──
+    const imageCount = count || 1
+    const creditCost = imageCount * CREDIT_COST_IMAGE
+    const deductResult = await deductCredits(
+      session.user.id,
+      creditCost,
+      "image-generator",
+      `Generate ${imageCount} gambar (${model || "imagen-4"})`
+    )
+
+    if (!deductResult.ok) {
+      return NextResponse.json(
+        { error: `Kredit tidak cukup. Butuh ${creditCost}, saldo: ${deductResult.balance}` },
+        { status: 402 }
+      )
+    }
+
     // Build base payload (without captcha)
     const basePayload: Record<string, unknown> = {
       prompt,
       model: model || "imagen-4",
       aspectRatio: aspectRatio || "16:9",
-      count: count || 1,
+      count: imageCount,
     }
 
     if (seed !== undefined && seed !== null) basePayload.seed = seed
@@ -78,7 +103,7 @@ export async function POST(req: NextRequest) {
 
       const data = await response.json()
 
-      // 403 = captcha rejected → retry with fresh token
+      // 403 = captcha rejected → retry
       if (response.status === 403 && attempt < MAX_CAPTCHA_RETRIES) {
         console.warn(`[image-generate] 403 captcha rejected, retrying (${attempt}/${MAX_CAPTCHA_RETRIES})...`)
         continue
@@ -101,17 +126,25 @@ export async function POST(req: NextRequest) {
         const fallbackData = await fallbackResponse.json()
 
         if (!fallbackResponse.ok) {
+          // ── Refund on failure ──
+          await refundCredits(session.user.id, creditCost, "image-generator")
           return NextResponse.json(
             { error: fallbackData.error || `API error: ${fallbackResponse.status}` },
             { status: fallbackResponse.status }
           )
         }
 
-        return NextResponse.json(fallbackData)
+        return NextResponse.json({
+          ...fallbackData,
+          creditsDeducted: creditCost,
+          remainingBalance: deductResult.balance,
+        })
       }
 
       // Any other error
       if (!response.ok) {
+        // ── Refund on failure ──
+        await refundCredits(session.user.id, creditCost, "image-generator")
         return NextResponse.json(
           { error: data.error || `API error: ${response.status}` },
           { status: response.status }
@@ -119,10 +152,15 @@ export async function POST(req: NextRequest) {
       }
 
       // Success
-      return NextResponse.json(data)
+      return NextResponse.json({
+        ...data,
+        creditsDeducted: creditCost,
+        remainingBalance: deductResult.balance,
+      })
     }
 
-    // Should never reach here, but just in case
+    // Should never reach here, but refund just in case
+    await refundCredits(session.user.id, creditCost, "image-generator")
     return NextResponse.json({ error: "Unexpected error in retry loop" }, { status: 500 })
   } catch (error) {
     console.error("Image generation error:", error)

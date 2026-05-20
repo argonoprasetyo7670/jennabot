@@ -48,6 +48,7 @@ import {
   ZapIcon,
 } from "lucide-react"
 import { generateImages, type GeneratedImage, generateVideos, type GeneratedVideo } from "@/lib/api/google-flow"
+import { downloadImage, downloadVideo } from "@/lib/download"
 import {
   getWorkflow,
   updateWorkflow,
@@ -212,15 +213,7 @@ function ImageGenNodeComponent({ data, id: nodeId }: NodeProps) {
 
   const handleDownload = async (url: string, idx: number) => {
     try {
-      const res = await fetch(`/api/ai/image-download?url=${encodeURIComponent(url)}`)
-      const blob = await res.blob()
-      const a = document.createElement("a")
-      a.href = URL.createObjectURL(blob)
-      a.download = `workflow-image-${idx + 1}.png`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(a.href)
+      await downloadImage(url, `workflow-image-${idx + 1}.png`)
     } catch { /* silent */ }
   }
 
@@ -515,11 +508,7 @@ function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
     const url = rawVideoUrl || generatedVideoUrl
     if (!url) return
     try {
-      const dlUrl = url.startsWith("/api/") ? url.replace("mode=inline", "mode=download") : `/api/ai/video-download?url=${encodeURIComponent(url)}`
-      const res = await fetch(dlUrl)
-      const blob = await res.blob()
-      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "workflow-video.mp4"
-      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href)
+      await downloadVideo(url, "workflow-video.mp4")
     } catch { /* silent */ }
   }
 
@@ -755,6 +744,68 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
     agentEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [agentMessages, agentThinking])
 
+  // Apply agent actions to canvas
+  const applyAgentActions = useCallback((actions: Record<string, unknown>[]) => {
+    if (!actions?.length) return
+    let actionsApplied = 0
+
+    for (const action of actions) {
+      switch (action.type) {
+        case "clearCanvas":
+          setNodes([])
+          setEdges([])
+          actionsApplied++
+          break
+
+        case "addNode": {
+          const pos = action.position as { x: number; y: number } || { x: 100, y: 250 }
+          const newNode: Node = {
+            id: action.id as string || `n_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+            type: action.nodeType as string,
+            position: pos,
+            data: (action.data as Record<string, unknown>) || {},
+          }
+          setNodes(nds => [...nds, newNode])
+          actionsApplied++
+          break
+        }
+
+        case "addEdge": {
+          const newEdge: Edge = {
+            id: `e_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+            source: action.source as string,
+            target: action.target as string,
+            sourceHandle: action.sourceHandle as string,
+            targetHandle: action.targetHandle as string,
+            animated: true,
+            markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+            style: { stroke: getPortColor(action.sourceHandle as string || ""), strokeWidth: 2 },
+          }
+          setEdges(eds => [...eds, newEdge])
+          actionsApplied++
+          break
+        }
+
+        case "removeNode":
+          setNodes(nds => nds.filter(n => n.id !== action.id))
+          setEdges(eds => eds.filter(e => e.source !== action.id && e.target !== action.id))
+          actionsApplied++
+          break
+
+        case "updateNode":
+          setNodes(nds => nds.map(n =>
+            n.id === action.id
+              ? { ...n, data: { ...n.data, ...(action.data as Record<string, unknown>) } }
+              : n
+          ))
+          actionsApplied++
+          break
+      }
+    }
+
+    return actionsApplied
+  }, [setNodes, setEdges])
+
   // Send message to agent API
   const sendAgentMessage = useCallback(async (userText: string) => {
     const newMsgs = [...agentMessages, { role: "user" as const, text: userText }]
@@ -775,13 +826,24 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
 
       if (!res.ok) throw new Error("Agent error")
       const data = await res.json()
-      setAgentMessages(prev => [...prev, { role: "agent", text: data.reply }])
+
+      // Apply actions to canvas
+      const actions = data.actions as Record<string, unknown>[] || []
+      const applied = actions.length > 0 ? applyAgentActions(actions) : 0
+
+      // Build reply with action summary
+      let reply = data.reply || "Siap!"
+      if (applied && applied > 0) {
+        reply += `\n\n✅ ${applied} perubahan diterapkan ke canvas.`
+      }
+
+      setAgentMessages(prev => [...prev, { role: "agent", text: reply }])
     } catch {
       setAgentMessages(prev => [...prev, { role: "agent", text: "⚠️ Gagal menghubungi agent. Coba lagi nanti." }])
     } finally {
       setAgentThinking(false)
     }
-  }, [agentMessages, nodes, edges])
+  }, [agentMessages, nodes, edges, applyAgentActions])
 
   // Load workflow
   useEffect(() => {
@@ -1085,10 +1147,10 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     <h3 className="text-sm font-bold text-foreground leading-snug">
-                      Workflow assistant yang membantu menyusun alur kerja AI kamu.
+                      AI assistant yang langsung menyusun workflow di canvas kamu.
                     </h3>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Bisa membaca canvas, menyusun node, dan membantu konfigurasi. Semua perubahan butuh konfirmasi.
+                      Cukup deskripsikan kebutuhan, agent akan membuat node, menghubungkan, dan mengonfigurasi semuanya.
                     </p>
 
                     <div className="space-y-2 pt-2">
@@ -1141,9 +1203,9 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
                   {/* Quick Actions */}
                   <div className="px-3 pb-1 flex flex-wrap gap-1">
                     {[
-                      { label: "Baca canvas", icon: ScanEyeIcon, msg: "Baca canvas saya dan analisis alurnya" },
-                      { label: "Buat template", icon: PencilRulerIcon, msg: "Buatkan template workflow untuk product review" },
-                      { label: "Optimasi", icon: ZapIcon, msg: "Optimasi workflow saya agar lebih efisien" },
+                      { label: "Baca canvas", icon: ScanEyeIcon, msg: "Baca dan analisis canvas saya sekarang" },
+                      { label: "Image → Video", icon: PencilRulerIcon, msg: "Buatkan workflow: Prompt → Image Generate → Video Generate → Output" },
+                      { label: "Batch gambar", icon: ZapIcon, msg: "Buatkan workflow batch generate 4 gambar dengan nano-banana-2 lalu simpan ke gallery" },
                     ].map(q => (
                       <button key={q.label} onClick={() => sendAgentMessage(q.msg)}
                         className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:border-violet-500/30 transition"

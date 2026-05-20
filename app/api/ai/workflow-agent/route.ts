@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { readFileSync } from "fs"
 import { join } from "path"
+import { CREDIT_COST_CHAT, deductCredits, refundCredits } from "@/lib/credit-guard"
 
 // Load system prompt from .md file (cached at module level)
 const SYSTEM_PROMPT = readFileSync(
@@ -11,7 +12,7 @@ const SYSTEM_PROMPT = readFileSync(
 
 export async function POST(req: NextRequest) {
   const session = await auth()
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -21,6 +22,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // ── Credit check & pre-deduct ──
+    const deductResult = await deductCredits(
+      session.user.id,
+      CREDIT_COST_CHAT,
+      "workflow-agent",
+      "Workflow Agent chat request"
+    )
+
+    if (!deductResult.ok) {
+      return NextResponse.json(
+        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_CHAT}, saldo: ${deductResult.balance}` },
+        { status: 402 }
+      )
+    }
+
     const { messages, canvas } = await req.json()
 
     // Build conversation for OpenAI
@@ -28,22 +44,22 @@ export async function POST(req: NextRequest) {
       { role: "system", content: SYSTEM_PROMPT },
     ]
 
-    // If canvas data is provided, add it as context
+    // Add canvas context
     if (canvas) {
       const nodesSummary = (canvas.nodes || []).map((n: { id: string; type: string; data: Record<string, unknown> }) => ({
         id: n.id, type: n.type, data: n.data,
       }))
       const edgesSummary = (canvas.edges || []).map((e: { source: string; target: string; sourceHandle: string; targetHandle: string }) => ({
-        from: e.source, to: e.target, sourcePort: e.sourceHandle, targetPort: e.targetHandle,
+        from: e.source, to: e.target, srcPort: e.sourceHandle, tgtPort: e.targetHandle,
       }))
 
       openaiMessages.push({
         role: "system",
-        content: `## Canvas saat ini:\nNodes (${nodesSummary.length}): ${JSON.stringify(nodesSummary)}\nEdges (${edgesSummary.length}): ${JSON.stringify(edgesSummary)}`,
+        content: `Canvas saat ini — Nodes (${nodesSummary.length}): ${JSON.stringify(nodesSummary)} | Edges (${edgesSummary.length}): ${JSON.stringify(edgesSummary)}`,
       })
     }
 
-    // Add conversation history (last 10 messages)
+    // Add conversation history (last 10)
     const recent = (messages || []).slice(-10)
     for (const msg of recent) {
       openaiMessages.push({
@@ -61,21 +77,36 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: openaiMessages,
-        max_tokens: 800,
+        max_tokens: 1500,
         temperature: 0.7,
+        response_format: { type: "json_object" },
       }),
     })
 
     if (!response.ok) {
+      // ── Refund on failure ──
+      await refundCredits(session.user.id, CREDIT_COST_CHAT, "workflow-agent")
       const err = await response.text()
       console.error("[workflow-agent] OpenAI error:", err)
       return NextResponse.json({ error: "AI service error" }, { status: 502 })
     }
 
     const data = await response.json()
-    const reply = data.choices?.[0]?.message?.content || "Maaf, saya tidak bisa merespons saat ini."
+    const raw = data.choices?.[0]?.message?.content || "{}"
 
-    return NextResponse.json({ reply })
+    // Parse structured response
+    let parsed: { reply?: string; actions?: unknown[] }
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      // Fallback: treat entire response as text reply
+      parsed = { reply: raw, actions: [] }
+    }
+
+    return NextResponse.json({
+      reply: parsed.reply || "Siap!",
+      actions: parsed.actions || [],
+    })
   } catch (error) {
     console.error("[workflow-agent] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

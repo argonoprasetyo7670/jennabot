@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
+import { CREDIT_COST_UPSCALE, deductCredits, refundCredits } from "@/lib/credit-guard"
 
 /**
  * POST /api/ai/image-upscale
@@ -10,7 +11,7 @@ import { auth } from "@/auth"
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -30,6 +31,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
     }
 
+    // ── Credit check & pre-deduct ──
+    const deductResult = await deductCredits(
+      session.user.id,
+      CREDIT_COST_UPSCALE,
+      "image-upscale",
+      `Upscale gambar ke ${resolution}`
+    )
+
+    if (!deductResult.ok) {
+      return NextResponse.json(
+        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_UPSCALE}, saldo: ${deductResult.balance}` },
+        { status: 402 }
+      )
+    }
+
     const res = await fetch("https://api.useapi.net/v1/google-flow/images/upscale", {
       method: "POST",
       headers: {
@@ -42,6 +58,8 @@ export async function POST(request: NextRequest) {
     const data = await res.json()
 
     if (!res.ok) {
+      // ── Refund on failure ──
+      await refundCredits(session.user.id, CREDIT_COST_UPSCALE, "image-upscale")
       const errorMsg = typeof data.error === "string"
         ? data.error
         : data.error?.message || `Upscale failed (${res.status})`
@@ -49,11 +67,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!data.encodedImage) {
+      // ── Refund — no image returned ──
+      await refundCredits(session.user.id, CREDIT_COST_UPSCALE, "image-upscale")
       return NextResponse.json({ error: "No upscaled image returned" }, { status: 500 })
     }
 
     return NextResponse.json({
       encodedImage: data.encodedImage,
+      creditsDeducted: CREDIT_COST_UPSCALE,
+      remainingBalance: deductResult.balance,
     })
   } catch (err) {
     console.error("[image-upscale] Error:", err)

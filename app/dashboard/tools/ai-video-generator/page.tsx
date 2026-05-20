@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { LottieLoading } from "@/components/lottie-loading"
 import { useGenerationQueue, CREDIT_COST_VIDEO } from "@/contexts/generation-queue"
+import { downloadVideo } from "@/lib/download"
 import type { VideoAspectRatio, VideoDuration, GeneratedVideo } from "@/lib/api/google-flow"
 
 /* ─── Constants ─── */
@@ -147,20 +148,10 @@ export default function AIVideoGeneratorPage() {
     }
   }
 
-  /** Download via server proxy */
+  /** Download via server proxy (Safari/iOS compatible) */
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
-      const res = await fetch(proxyUrl)
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = blobUrl
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
+      await downloadVideo(url, filename)
     } catch {
       window.open(url, "_blank")
     }

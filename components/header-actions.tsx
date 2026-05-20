@@ -24,6 +24,7 @@ import {
 import { useGenerationQueue, type GenerationJob } from "@/contexts/generation-queue"
 import { useCredits } from "@/contexts/credits"
 import { cn } from "@/lib/utils"
+import { downloadVideo, downloadImage } from "@/lib/download"
 import { VideoIcon } from "lucide-react"
 
 export function HeaderActions() {
@@ -418,18 +419,11 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const proxyRoute = isVideo ? "/api/ai/video-download" : "/api/ai/image-download"
-      const proxyUrl = `${proxyRoute}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
-      const res = await fetch(proxyUrl)
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = blobUrl
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
+      if (isVideo) {
+        await downloadVideo(url, filename)
+      } else {
+        await downloadImage(url, filename)
+      }
     } catch {
       window.open(url, "_blank")
     }

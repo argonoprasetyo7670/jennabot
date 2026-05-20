@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { cn } from "@/lib/utils"
+import { downloadMedia } from "@/lib/download"
 import {
   ImageIcon,
   VideoIcon,
@@ -110,23 +111,13 @@ export default function GalleryPage() {
     return () => observer.disconnect()
   }, [hasMore, loadingMore, nextCursor, fetchItems])
 
-  // Download via proxy
+  // Download via proxy (Safari/iOS compatible)
   const handleDownload = async (item: GalleryItem) => {
     const isVideo = item.type === "video"
-    const route = isVideo ? "/api/ai/video-download" : "/api/ai/image-download"
     const ext = isVideo ? "mp4" : "png"
     const filename = `jenna-${item.id.slice(0, 8)}.${ext}`
     try {
-      const res = await fetch(`${route}?url=${encodeURIComponent(item.gcsUrl)}&filename=${encodeURIComponent(filename)}`)
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = blobUrl
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
+      await downloadMedia(item.gcsUrl, filename, isVideo ? "video" : "image")
     } catch {
       window.open(item.gcsUrl, "_blank")
     }

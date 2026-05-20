@@ -79,15 +79,22 @@ export async function GET(req: NextRequest) {
         const end = match[2] ? parseInt(match[2], 10) : totalSize - 1
         const chunkSize = end - start + 1
 
-        return new NextResponse(buffer.slice(start, end + 1), {
-          status: 206,
-          headers: {
+        const rangeHeaders: Record<string, string> = {
             "Content-Type": contentType,
             "Content-Range": `bytes ${start}-${end}/${totalSize}`,
             "Content-Length": String(chunkSize),
             "Accept-Ranges": "bytes",
             "Cache-Control": "public, max-age=3600",
-          },
+          }
+
+          // Safari iOS needs Content-Disposition even on Range responses
+          if (mode === "attachment") {
+            rangeHeaders["Content-Disposition"] = `attachment; filename="${filename}"`
+          }
+
+          return new NextResponse(buffer.slice(start, end + 1), {
+          status: 206,
+          headers: rangeHeaders,
         })
       }
     }

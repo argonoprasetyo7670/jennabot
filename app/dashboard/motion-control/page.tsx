@@ -21,6 +21,7 @@ import { DashboardHeader } from "@/components/dashboard-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { downloadVideo } from "@/lib/download"
 
 const CREDIT_COST = 120
 
@@ -219,16 +220,7 @@ export default function MotionControlPage() {
   const handleDownload = async (url: string, index: number) => {
     const filename = `motion-control-${task?.taskId?.slice(0, 8) || index + 1}.mp4`
     try {
-      const res = await fetch(`/api/ai/video-download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`)
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = blobUrl
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
+      await downloadVideo(url, filename)
     } catch {
       window.open(url, "_blank")
     }

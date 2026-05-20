@@ -203,10 +203,10 @@ function submitJobToStore(
         email: refs.length > 0 ? email : undefined,
       })
 
-      // Deduct credits only on success: count × 5 credits per image
+      // Credits are deducted server-side. Just update UI balance.
       const imageCount = result.images.length || 1
       const creditCost = imageCount * CREDIT_COST_IMAGE
-      await deductCredits(creditCost, "image-generator", `Generate ${imageCount} gambar (${params.model})`)
+      window.dispatchEvent(new CustomEvent("credits-updated"))
 
       updateJobInStore(id, {
         status: "done",
@@ -337,25 +337,8 @@ function submitVideoJobToStore(
   return id
 }
 
-/* ─── Credit Deduction Helper ─── */
-async function deductCredits(amount: number, feature: string, description: string) {
-  try {
-    const res = await fetch("/api/credits", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, feature, description }),
-    })
-    if (res.ok) {
-      // Notify CreditsProvider to refresh balance display
-      window.dispatchEvent(new CustomEvent("credits-updated"))
-      console.log(`[credits] Deducted ${amount} credits for ${feature}`)
-    } else {
-      console.warn(`[credits] Failed to deduct: ${res.status}`)
-    }
-  } catch (err) {
-    console.error("[credits] Deduction request failed:", err)
-  }
-}
+/* ─── NOTE: Credit deduction is handled server-side in API routes ─── */
+/* ─── Client only dispatches 'credits-updated' to refresh UI balance ─── */
 
 /* ─── React Context ─── */
 interface GenerationQueueContextValue {

@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { LottieLoading } from "@/components/lottie-loading"
+import { downloadMedia } from "@/lib/download"
 import { useGenerationQueue, CREDIT_COST_IMAGE, CREDIT_COST_VIDEO, type GenerationJob } from "@/contexts/generation-queue"
 import {
   uploadImageAsset, generateImages, generateVideos,
@@ -257,13 +258,8 @@ export default function ReviewProductPage() {
 
   const handleDownload = async (url: string, filename: string) => {
     try {
-      const route = filename.endsWith(".mp4") ? "/api/ai/video-download" : "/api/ai/image-download"
-      const res = await fetch(`${route}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}&mode=attachment`)
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement("a"); a.href = blobUrl; a.download = filename
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
+      const type = filename.endsWith(".mp4") ? "video" as const : "image" as const
+      await downloadMedia(url, filename, type)
     } catch { window.open(url, "_blank") }
   }
 
