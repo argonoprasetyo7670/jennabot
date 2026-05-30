@@ -103,7 +103,7 @@ export function HeaderActions() {
       >
         <CoinsIcon className="h-4 w-4 text-amber-500" />
         <span className="hidden sm:inline">
-          {creditsLoading ? "..." : balance.toLocaleString()}
+          {creditsLoading ? "..." : (balance ?? 0).toLocaleString()}
         </span>
       </Button>
 

@@ -204,7 +204,7 @@ export default function ReviewProductPage() {
       setPhase("generating-image")
       updateJob(jobId, { status: "generating", progress: "Membuat gambar review..." })
       const imgResult = await generateImages({
-        prompt: imagePrompt, model: "nano-banana-2", aspectRatio: "3:4", count: 1,
+        prompt: imagePrompt, model: "nano-banana-2", aspectRatio: "9:16", count: 1,
         references: [refId], email,
       })
       const img = imgResult.images[0]
@@ -424,7 +424,7 @@ export default function ReviewProductPage() {
                     <ImageIcon className="h-4 w-4 text-violet-400" /> Gambar Review
                   </h2>
                   <div className="overflow-hidden rounded-2xl border border-border bg-card/50">
-                    <div className="relative aspect-[3/4] max-h-[400px] mx-auto">
+                    <div className="relative aspect-[9/16] max-h-[400px] mx-auto">
                       <Image src={generatedImage.url} alt="Generated review" fill className="object-contain" unoptimized />
                     </div>
                     <div className="flex justify-center gap-1 border-t border-border py-2">
@@ -438,7 +438,7 @@ export default function ReviewProductPage() {
                           try {
                             await fetch("/api/gallery/save", {
                               method: "POST", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ url: generatedImage.url, type: "image", prompt: customPrompt, model: "nano-banana-2", aspectRatio: "3:4", mediaGenerationId: generatedImage.mediaGenerationId }),
+                              body: JSON.stringify({ url: generatedImage.url, type: "image", prompt: customPrompt, model: "nano-banana-2", aspectRatio: "9:16", mediaGenerationId: generatedImage.mediaGenerationId }),
                             })
                             setSavedImage(true)
                           } catch { /* ignore */ } finally { setSavingImage(false) }

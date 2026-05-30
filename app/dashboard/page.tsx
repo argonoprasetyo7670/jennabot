@@ -157,14 +157,15 @@ interface DashboardStats {
 }
 
 /* ─── format helpers ─── */
-function formatNumber(n: number): string {
+function formatNumber(n: number | undefined | null): string {
+  if (n == null) return "0"
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`
   return n.toLocaleString("id-ID")
 }
 
-function formatCurrency(n: number): string {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n)
+function formatCurrency(n: number | undefined | null): string {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n ?? 0)
 }
 
 function formatTimeAgo(dateStr: string): string {

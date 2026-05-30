@@ -207,7 +207,7 @@ export default function BuyCreditsPage() {
               <div className="mb-5 inline-flex items-center gap-2.5 rounded-2xl border border-violet-500/20 bg-violet-500/10 px-5 py-2.5 backdrop-blur-sm">
                 <CoinsIcon className="h-5 w-5 text-violet-400" />
                 <span className="text-sm text-muted-foreground">Saldo Anda</span>
-                <span className="text-lg font-black text-foreground">{balance.toLocaleString()}</span>
+                <span className="text-lg font-black text-foreground">{(balance ?? 0).toLocaleString()}</span>
                 <span className="text-sm text-muted-foreground">credits</span>
               </div>
 
