@@ -467,7 +467,7 @@ export default function ReviewProductPage() {
                       <button onClick={() => setPreviewVideo(generatedVideo)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
                         <PlayIcon className="h-3.5 w-3.5" /> Fullscreen
                       </button>
-                      <button onClick={() => handleDownload(generatedVideo.url, "review-video.mp4")} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                      <button onClick={() => handleDownload(generatedVideo.rawUrl || generatedVideo.url, "review-video.mp4")} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
                         <DownloadIcon className="h-3.5 w-3.5" /> Download
                       </button>
                       <button
@@ -506,7 +506,7 @@ export default function ReviewProductPage() {
           <div className="relative max-h-[90vh] max-w-[90vw] w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
             <video src={(previewVideo as GeneratedVideo & { proxyUrl?: string }).proxyUrl || previewVideo.url} className="max-h-[80vh] w-full rounded-2xl object-contain" controls autoPlay playsInline crossOrigin="anonymous" />
             <div className="mt-4 flex items-center justify-center gap-2">
-              <button onClick={() => handleDownload(previewVideo.url, "review-video.mp4")} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm hover:bg-white/20">
+              <button onClick={() => handleDownload(previewVideo.rawUrl || previewVideo.url, "review-video.mp4")} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm hover:bg-white/20">
                 <DownloadIcon className="h-4 w-4" /> Download
               </button>
               <button onClick={() => setPreviewVideo(null)} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm hover:bg-white/20">
