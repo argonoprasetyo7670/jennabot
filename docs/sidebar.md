@@ -75,15 +75,16 @@ DashboardLayout (app/dashboard/layout.tsx)                [Server Component]
 ### 🎬 Video Tools (Collapsible Group)
 | Item | Route | Deskripsi |
 |---|---|---|
-| AI Video Generator | `/dashboard/tools/ai-video-generator` | Generate video AI dari teks/gambar (Kling AI, dll) |
+| AI Video Generator | `/dashboard/tools/ai-video-generator` | Generate video AI dari teks/gambar (Veo 3.1) |
 | Review Product | `/dashboard/review-product` | Generate video review produk otomatis |
+| Seedance 2.0 | `/dashboard/seedance` | ✅ Video generation multi-reference Seedance 2.0 (via Runway API) — 120 credits |
+| Motion Control | `/dashboard/motion-control` | ✅ Animate karakter dari gambar + video performa — Kling 3.0 Motion Control (via Runway API) — 120 credits |
 | Storyboard | `/dashboard/storyboard` | Buat storyboard visual untuk video |
 | Scene Builder | `/dashboard/scene-builder` | Bangun scene-by-scene untuk produksi video |
 | Video Template | `/dashboard/video-template` | Template video siap pakai untuk berbagai kebutuhan |
 | TikTok Hook Generator | `/dashboard/tiktok-hook-gen` | Generate hook/opening TikTok yang menarik |
 | Perpanjang Video | `/dashboard/extend-video` | Perpanjang durasi video yang sudah ada |
 | Gabungkan Video | `/dashboard/concatenate-video` | Gabungkan beberapa video menjadi satu |
-| Motion Control | `/dashboard/motion-control` | Kontrol gerakan kamera & subjek dalam video AI |
 | Kling v3 Omni | `/dashboard/kling-v3-omni` | Video generation dengan model Kling v3 Omni |
 | Seedance Pro | `/dashboard/seedance-pro` | Video generation dengan model Seedance Pro |
 

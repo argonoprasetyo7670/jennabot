@@ -1,543 +1,368 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import Image from "next/image"
 import {
-  AlertCircleIcon,
-  CheckCircle2Icon,
-  ClipboardIcon,
-  DownloadIcon,
-  EyeIcon,
-  EyeOffIcon,
-  FilmIcon,
-  KeyRoundIcon,
-  Loader2Icon,
-  RefreshCwIcon,
-  SaveIcon,
-  SendIcon,
-  SlidersHorizontalIcon,
-  SparklesIcon,
+  SendIcon, Loader2Icon, DownloadIcon, XIcon, UserIcon,
+  VideoIcon, PlayIcon, BookmarkIcon, CheckIcon, UploadCloudIcon,
 } from "lucide-react"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { DashboardHeader } from "@/components/dashboard-header"
+import { LottieLoading } from "@/components/lottie-loading"
+import { useGenerationQueue, CREDIT_COST_RUNWAY, type GenerationJob } from "@/contexts/generation-queue"
 import { downloadVideo } from "@/lib/download"
+import {
+  uploadRunwayAsset, generateRunwayVideo,
+  type RunwayGeneratedVideo,
+} from "@/lib/api/runway-flow"
 
-const CREDIT_COST = 120
+/* ─── Constants ─── */
+const MODEL_ID = "kling-3.0-motion-control" as const
+const MODEL_NAME = "Kling 3.0 Motion Control"
 
-type MotionTier = "pro" | "std"
-type MotionOrientation = "video" | "image"
+type Phase = "idle" | "uploading-image" | "uploading-video" | "generating" | "done" | "error"
 
-interface MotionTask {
-  taskId?: string
-  status: string
-  generated: string[]
-  tier: MotionTier
-  balance?: number
-  creditsDeducted?: number
-}
-
-const COMPLETED_STATUSES = new Set(["COMPLETED", "SUCCEEDED", "SUCCESS", "DONE"])
-const FAILED_STATUSES = new Set(["FAILED", "ERROR", "CANCELED", "CANCELLED"])
-
-function statusLabel(status: string) {
-  const normalized = status.toUpperCase()
-  if (COMPLETED_STATUSES.has(normalized)) return "Selesai"
-  if (FAILED_STATUSES.has(normalized)) return "Gagal"
-  return "Diproses"
+const PHASE_LABELS: Record<Phase, string> = {
+  idle: "", "uploading-image": "Mengupload gambar karakter...",
+  "uploading-video": "Mengupload video performa...",
+  generating: "Membuat video (bisa 2-5 menit)...", done: "Selesai!", error: "Gagal",
 }
 
 export default function MotionControlPage() {
-  const [apiKey, setApiKey] = useState("")
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [rememberKey, setRememberKey] = useState(false)
-  const [imageUrl, setImageUrl] = useState("")
-  const [videoUrl, setVideoUrl] = useState("")
-  const [webhookUrl, setWebhookUrl] = useState("")
-  const [prompt, setPrompt] = useState("")
-  const [tier, setTier] = useState<MotionTier>("pro")
-  const [orientation, setOrientation] = useState<MotionOrientation>("video")
-  const [cfgScale, setCfgScale] = useState(0.5)
-  const [balance, setBalance] = useState<number | null>(null)
-  const [task, setTask] = useState<MotionTask | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [polling, setPolling] = useState(false)
-  const [error, setError] = useState("")
-  const [savedUrls, setSavedUrls] = useState<Set<string>>(new Set())
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const pollRef = useRef<NodeJS.Timeout | null>(null)
+  const [characterImage, setCharacterImage] = useState<{ file: File; preview: string } | null>(null)
+  const [performanceVideo, setPerformanceVideo] = useState<{ file: File; preview: string } | null>(null)
+  const [customPrompt, setCustomPrompt] = useState("")
+  const [orientation, setOrientation] = useState<"image" | "video">("image")
+  const [audioEnabled, setAudioEnabled] = useState(true)
+  const [resolution, setResolution] = useState<"720p" | "1080p">("720p")
+  const [phase, setPhase] = useState<Phase>("idle")
+  const [generatedVideo, setGeneratedVideo] = useState<RunwayGeneratedVideo | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [previewModal, setPreviewModal] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const normalizedStatus = task?.status.toUpperCase() || ""
-  const isDone = COMPLETED_STATUSES.has(normalizedStatus)
-  const isFailed = FAILED_STATUSES.has(normalizedStatus)
-  const canSubmit = apiKey.trim() && imageUrl.trim() && videoUrl.trim() && !loading
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
 
-  const tierLabel = useMemo(() => (tier === "pro" ? "Kling 3 Pro" : "Kling 3 Standard"), [tier])
+  const { addCustomJob, updateJob } = useGenerationQueue()
+
+  const allReady = characterImage && performanceVideo
+  const isProcessing = phase !== "idle" && phase !== "done" && phase !== "error"
 
   useEffect(() => {
-    let cancelled = false
-    const timeout = window.setTimeout(() => {
-      const storedKey = localStorage.getItem("jenna:magnific-api-key")
-      if (storedKey && !cancelled) {
-        setApiKey(storedKey)
-        setRememberKey(true)
-      }
-    }, 0)
-
-    fetch("/api/credits")
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
-        if (ok && !cancelled) setBalance(data.balance ?? 0)
-      })
-      .catch(() => {
-        // ignored
-      })
-
     return () => {
-      cancelled = true
-      window.clearTimeout(timeout)
+      if (characterImage) URL.revokeObjectURL(characterImage.preview)
+      if (performanceVideo) URL.revokeObjectURL(performanceVideo.preview)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, [])
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (characterImage) URL.revokeObjectURL(characterImage.preview)
+    setCharacterImage({ file, preview: URL.createObjectURL(file) })
+    if (imageInputRef.current) imageInputRef.current.value = ""
+  }
 
-  const checkStatus = useCallback(async (currentTask = task) => {
-    if (!currentTask?.taskId || !apiKey.trim()) return
-    setPolling(true)
-    setError("")
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (performanceVideo) URL.revokeObjectURL(performanceVideo.preview)
+    setPerformanceVideo({ file, preview: URL.createObjectURL(file) })
+    if (videoInputRef.current) videoInputRef.current.value = ""
+  }
 
-    try {
-      const params = new URLSearchParams({
-        taskId: currentTask.taskId,
-        tier: currentTask.tier,
-      })
-      const res = await fetch(`/api/ai/motion-control?${params}`, {
-        headers: {
-          "x-magnific-api-key": apiKey.trim(),
-        },
-      })
-      const data = await res.json()
+  const handleGenerate = async () => {
+    if (!allReady || isProcessing) return
+    setError(null)
+    setGeneratedVideo(null)
+    setSaved(false)
 
-      if (!res.ok) {
-        setError(data.error || "Gagal mengecek status")
-        return
-      }
-
-      setTask((prev) => ({
-        ...prev,
-        ...data,
-        generated: data.generated || prev?.generated || [],
-      }))
-    } catch {
-      setError("Gagal menghubungi server")
-    } finally {
-      setPolling(false)
-    }
-  }, [apiKey, task])
-
-  useEffect(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
-    }
-
-    if (!task?.taskId || isDone || isFailed) return
-
-    pollRef.current = setInterval(() => {
-      checkStatus(task)
-    }, 8000)
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, [checkStatus, isDone, isFailed, task])
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!canSubmit) return
-
-    setLoading(true)
-    setError("")
-    setTask(null)
-
-    if (rememberKey) {
-      localStorage.setItem("jenna:magnific-api-key", apiKey.trim())
-    } else {
-      localStorage.removeItem("jenna:magnific-api-key")
-    }
+    const jobId = `motion-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 
     try {
-      const res = await fetch("/api/ai/motion-control", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apiKey: apiKey.trim(),
-          imageUrl: imageUrl.trim(),
-          videoUrl: videoUrl.trim(),
-          webhookUrl: webhookUrl.trim(),
-          prompt: prompt.trim(),
-          tier,
-          characterOrientation: orientation,
-          cfgScale,
-        }),
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || "Gagal membuat task Motion Control")
-        if (typeof data.balance === "number") setBalance(data.balance)
-        return
+      const queueJob: GenerationJob = {
+        id: jobId, type: "video", prompt: customPrompt || "Motion Control",
+        model: MODEL_NAME, status: "uploading", progress: "Mengupload...",
+        images: [], videos: [], createdAt: new Date(),
+        params: { prompt: customPrompt || "Motion Control" },
       }
+      addCustomJob(queueJob)
 
-      setTask({
-        taskId: data.taskId,
-        status: data.status || "CREATED",
-        generated: data.generated || [],
-        tier: data.tier || tier,
-        balance: data.balance,
-        creditsDeducted: data.creditsDeducted,
+      // Step 1: Upload character image
+      setPhase("uploading-image")
+      updateJob(jobId, { status: "uploading", progress: PHASE_LABELS["uploading-image"] })
+      const imageResult = await uploadRunwayAsset(characterImage!.file)
+
+      // Step 2: Upload performance video
+      setPhase("uploading-video")
+      updateJob(jobId, { progress: PHASE_LABELS["uploading-video"] })
+      const videoResult = await uploadRunwayAsset(performanceVideo!.file)
+
+      // Step 3: Generate motion control video
+      setPhase("generating")
+      updateJob(jobId, { status: "generating", progress: PHASE_LABELS.generating })
+
+      const result = await generateRunwayVideo({
+        model: MODEL_ID,
+        text_prompt: customPrompt || undefined,
+        imageAssetIds: [imageResult.assetId],
+        videoAssetId: videoResult.assetId,
+        characterOrientation: orientation,
+        audio: audioEnabled,
+        resolution,
+        feature: "motion-control",
       })
-      if (typeof data.balance === "number") setBalance(data.balance)
-      if (data.taskId) {
-        setTimeout(() => checkStatus({
-          taskId: data.taskId,
-          status: data.status || "CREATED",
-          generated: data.generated || [],
-          tier: data.tier || tier,
-        }), 1500)
-      }
-    } catch {
-      setError("Gagal menghubungi server")
-    } finally {
-      setLoading(false)
+
+      const vid = result.videos[0]
+      if (!vid) throw new Error("Tidak ada video yang dihasilkan")
+
+      setGeneratedVideo(vid)
+      setPhase("done")
+      updateJob(jobId, {
+        status: "done", progress: undefined,
+        videos: [{ url: vid.url, rawUrl: vid.url }],
+        creditsDeducted: CREDIT_COST_RUNWAY, completedAt: new Date(),
+      })
+      window.dispatchEvent(new CustomEvent("credits-updated"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Generation failed"
+      setError(msg)
+      setPhase("error")
+      updateJob(jobId, {
+        status: "error", progress: undefined,
+        error: msg, completedAt: new Date(),
+      })
     }
   }
 
-  const handleDownload = async (url: string, index: number) => {
-    const filename = `motion-control-${task?.taskId?.slice(0, 8) || index + 1}.mp4`
-    try {
-      await downloadVideo(url, filename)
-    } catch {
-      window.open(url, "_blank")
-    }
-  }
-
-  const handleSave = async (url: string) => {
-    if (savedUrls.has(url)) return
-    try {
-      const res = await fetch("/api/gallery/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          type: "video",
-          prompt,
-          model: tierLabel,
-          aspectRatio: orientation,
-          mediaGenerationId: task?.taskId,
-          sourceAction: "motion-control",
-        }),
-      })
-      if (res.ok) setSavedUrls((prev) => new Set(prev).add(url))
-    } catch {
-      // ignored
-    }
+  const handleDownload = async (url: string, filename: string) => {
+    try { await downloadVideo(url, filename) }
+    catch { window.open(url, "_blank") }
   }
 
   return (
-    <div className="flex h-[calc(100vh-0px)] flex-col bg-background">
+    <div className="relative flex h-[calc(100vh-0px)] flex-col overflow-hidden bg-background">
       <DashboardHeader breadcrumbs={[
         { label: "Jenna Bot Pro", href: "/dashboard" },
         { label: "Video Tools", href: "/dashboard" },
         { label: "Motion Control" },
       ]} />
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[520px_minmax(0,1fr)]">
-          <form onSubmit={handleSubmit} className="h-fit border border-border bg-card p-4 shadow-sm">
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <SlidersHorizontalIcon className="h-4 w-4 text-violet-400" />
-                  Kling v3 Motion Control
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">Biaya {CREDIT_COST} kredit per task</p>
-              </div>
-              <div className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                Saldo: {balance ?? "..."}
-              </div>
+      <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleImageUpload} />
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleVideoUpload} />
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-4xl px-4 py-8">
+          {/* Header */}
+          <div className="mb-8 text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-4 py-1.5 text-sm text-cyan-400">
+              <PlayIcon className="h-4 w-4" /> Motion Control
             </div>
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Kling 3.0 Motion Control</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Upload karakter + video performa — AI akan meng-animate karakter mengikuti gerakan</p>
+          </div>
 
-            <div className="space-y-5">
-              <div>
-                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <KeyRoundIcon className="h-3.5 w-3.5" />
-                  API Key Magnific
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type={showApiKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                    placeholder="mapi_..."
-                    className="h-10 rounded-md border border-input bg-background px-3"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowApiKey((value) => !value)}
-                    title={showApiKey ? "Sembunyikan API key" : "Tampilkan API key"}
-                  >
-                    {showApiKey ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                  </Button>
-                </div>
-                <label className="mt-2 flex w-fit items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={rememberKey}
-                    onChange={(event) => setRememberKey(event.target.checked)}
-                    className="size-3.5 accent-violet-500"
-                  />
-                  Ingat di perangkat ini
-                </label>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Model</label>
-                  <div className="grid grid-cols-2 overflow-hidden rounded-md border border-border">
-                    {(["pro", "std"] as MotionTier[]).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setTier(value)}
-                        className={cn(
-                          "h-10 text-xs font-semibold transition",
-                          tier === value ? "bg-violet-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {value === "pro" ? "Pro" : "Standard"}
-                      </button>
-                    ))}
+          {/* Upload Slots */}
+          <div className="mb-8 grid grid-cols-2 gap-6">
+            {/* Character Image */}
+            <div className="flex flex-col items-center">
+              <span className="mb-2 text-xs font-semibold uppercase tracking-wider text-cyan-400">🖼️ Karakter (Gambar)</span>
+              {characterImage ? (
+                <div className="group relative aspect-[3/4] w-full max-w-[240px] overflow-hidden rounded-2xl border-2 border-cyan-500/40 ring-1 ring-cyan-500/30">
+                  <Image src={characterImage.preview} alt="Character" fill className="object-cover" unoptimized />
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition group-hover:opacity-100">
+                    <button onClick={() => imageInputRef.current?.click()} className="flex h-9 items-center gap-1.5 rounded-lg bg-white/20 px-3 text-xs text-white backdrop-blur-sm hover:bg-white/30">
+                      <UploadCloudIcon className="h-3.5 w-3.5" /> Ganti
+                    </button>
+                    <button onClick={() => { URL.revokeObjectURL(characterImage.preview); setCharacterImage(null) }} className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/30 text-white backdrop-blur-sm hover:bg-red-500/50">
+                      <XIcon className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Orientasi</label>
-                  <div className="grid grid-cols-2 overflow-hidden rounded-md border border-border">
-                    {(["video", "image"] as MotionOrientation[]).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setOrientation(value)}
-                        className={cn(
-                          "h-10 text-xs font-semibold transition",
-                          orientation === value ? "bg-cyan-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {value === "video" ? "Video" : "Image"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">URL gambar karakter</label>
-                <Input
-                  value={imageUrl}
-                  onChange={(event) => setImageUrl(event.target.value)}
-                  placeholder="https://..."
-                  className="h-10 rounded-md border border-input bg-background px-3"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">URL video referensi</label>
-                <Input
-                  value={videoUrl}
-                  onChange={(event) => setVideoUrl(event.target.value)}
-                  placeholder="https://..."
-                  className="h-10 rounded-md border border-input bg-background px-3"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Prompt</label>
-                <textarea
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value.slice(0, 2500))}
-                  placeholder="Tambahkan arahan gerakan, ekspresi, atau gaya kamera"
-                  rows={4}
-                  className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
-                />
-                <div className="mt-1 text-right text-[10px] text-muted-foreground">{prompt.length}/2500</div>
-              </div>
-
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted-foreground">
-                  <span>CFG Scale</span>
-                  <span>{cfgScale.toFixed(2)}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={cfgScale}
-                  onChange={(event) => setCfgScale(Number(event.target.value))}
-                  className="w-full accent-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Webhook URL</label>
-                <Input
-                  value={webhookUrl}
-                  onChange={(event) => setWebhookUrl(event.target.value)}
-                  placeholder="https://..."
-                  className="h-10 rounded-md border border-input bg-background px-3"
-                />
-              </div>
-
-              {error && (
-                <div className="flex gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-                  <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <Button type="submit" disabled={!canSubmit} className="h-11 w-full rounded-md">
-                {loading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
-                Generate Motion
-              </Button>
-            </div>
-          </form>
-
-          <div className="min-h-[620px] border border-border bg-card shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <FilmIcon className="h-4 w-4 text-cyan-400" />
-                  Hasil Motion Control
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{tierLabel} - {orientation === "video" ? "orientasi video" : "orientasi image"}</p>
-              </div>
-              {task?.taskId && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigator.clipboard.writeText(task.taskId || "")}
-                    className="rounded-md"
-                  >
-                    <ClipboardIcon className="h-3.5 w-3.5" />
-                    Task ID
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => checkStatus()}
-                    disabled={polling}
-                    className="rounded-md"
-                  >
-                    <RefreshCwIcon className={cn("h-3.5 w-3.5", polling && "animate-spin")} />
-                    Refresh
-                  </Button>
-                </div>
+              ) : (
+                <button onClick={() => imageInputRef.current?.click()} className="flex aspect-[3/4] w-full max-w-[240px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-cyan-500/40 bg-card/50 transition-all hover:scale-[1.02] hover:border-cyan-500/60">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400"><UserIcon className="h-6 w-6" /></div>
+                  <p className="text-xs font-medium text-foreground/70">Upload Gambar Karakter</p>
+                </button>
               )}
             </div>
 
-            <div className="p-4">
-              {task && (
-                <div className={cn(
-                  "mb-4 flex items-center justify-between gap-3 rounded-md border p-3 text-sm",
-                  isDone ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" :
-                    isFailed ? "border-red-500/30 bg-red-500/10 text-red-300" :
-                      "border-violet-500/30 bg-violet-500/10 text-violet-300"
-                )}>
-                  <div className="flex items-center gap-2">
-                    {isDone ? <CheckCircle2Icon className="h-4 w-4" /> : <SparklesIcon className="h-4 w-4" />}
-                    <span>{statusLabel(task.status)}</span>
-                  </div>
-                  <span className="text-xs opacity-80">{task.status}</span>
-                </div>
-              )}
-
-              {!task && (
-                <div className="flex min-h-[500px] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
-                  <FilmIcon className="h-16 w-16 opacity-30" strokeWidth={1} />
-                  <p className="text-sm font-medium">Belum ada task Motion Control</p>
-                </div>
-              )}
-
-              {task && task.generated.length === 0 && !isDone && !isFailed && (
-                <div className="flex min-h-[500px] flex-col items-center justify-center gap-3 text-center">
-                  <Loader2Icon className="h-10 w-10 animate-spin text-violet-400" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Video sedang diproses</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Status diperbarui otomatis</p>
+            {/* Performance Video */}
+            <div className="flex flex-col items-center">
+              <span className="mb-2 text-xs font-semibold uppercase tracking-wider text-rose-400">🎬 Performa (Video)</span>
+              {performanceVideo ? (
+                <div className="group relative aspect-[3/4] w-full max-w-[240px] overflow-hidden rounded-2xl border-2 border-rose-500/40 ring-1 ring-rose-500/30">
+                  <video src={performanceVideo.preview} className="h-full w-full object-cover" muted loop autoPlay playsInline />
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition group-hover:opacity-100">
+                    <button onClick={() => videoInputRef.current?.click()} className="flex h-9 items-center gap-1.5 rounded-lg bg-white/20 px-3 text-xs text-white backdrop-blur-sm hover:bg-white/30">
+                      <UploadCloudIcon className="h-3.5 w-3.5" /> Ganti
+                    </button>
+                    <button onClick={() => { URL.revokeObjectURL(performanceVideo.preview); setPerformanceVideo(null) }} className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/30 text-white backdrop-blur-sm hover:bg-red-500/50">
+                      <XIcon className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-              )}
-
-              {task && task.generated.length > 0 && (
-                <div className="grid gap-4 xl:grid-cols-2">
-                  {task.generated.map((url, index) => (
-                    <div key={url} className="overflow-hidden rounded-md border border-border bg-background">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewUrl(url)}
-                        className="block aspect-video w-full bg-black"
-                      >
-                        <video src={url} className="h-full w-full object-contain" muted loop autoPlay playsInline />
-                      </button>
-                      <div className="flex items-center justify-between gap-2 border-t border-border p-2">
-                        <span className="truncate text-[10px] text-muted-foreground">Video {index + 1}</span>
-                        <div className="flex items-center gap-1">
-                          <Button type="button" variant="ghost" size="icon-xs" onClick={() => setPreviewUrl(url)} title="Preview">
-                            <EyeIcon className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon-xs" onClick={() => handleSave(url)} title="Simpan">
-                            <SaveIcon className={cn("h-3.5 w-3.5", savedUrls.has(url) && "text-emerald-400")} />
-                          </Button>
-                          <Button type="button" variant="ghost" size="icon-xs" onClick={() => handleDownload(url, index)} title="Download">
-                            <DownloadIcon className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              ) : (
+                <button onClick={() => videoInputRef.current?.click()} className="flex aspect-[3/4] w-full max-w-[240px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-rose-500/40 bg-card/50 transition-all hover:scale-[1.02] hover:border-rose-500/60">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400"><VideoIcon className="h-6 w-6" /></div>
+                  <p className="text-xs font-medium text-foreground/70">Upload Video Performa</p>
+                  <p className="text-[10px] text-muted-foreground/50">3–30 detik</p>
+                </button>
               )}
             </div>
           </div>
+
+          {/* Options */}
+          <div className="mb-6 space-y-4">
+            {/* Orientation */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">🧭 Orientasi Karakter</label>
+              <div className="flex gap-2">
+                {(["image", "video"] as const).map((opt) => (
+                  <button key={opt} onClick={() => setOrientation(opt)}
+                    className={cn("rounded-full border px-4 py-1.5 text-xs font-medium transition-all",
+                      orientation === opt ? "border-cyan-500 bg-cyan-500/20 text-cyan-300" : "border-border bg-card/50 text-muted-foreground hover:border-border/80 hover:bg-muted/50")}>
+                    {opt === "image" ? "🖼️ Ikuti Gambar" : "🎬 Ikuti Video"}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground/60">
+                {orientation === "image" ? "Orientasi karakter mengikuti pose di gambar" : "Orientasi karakter mengikuti pose di video performa"}
+              </p>
+            </div>
+
+            {/* Resolution */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">📐 Resolusi</label>
+              <div className="flex gap-2">
+                {(["720p", "1080p"] as const).map((res) => (
+                  <button key={res} onClick={() => setResolution(res)}
+                    className={cn("rounded-full border px-4 py-1.5 text-xs font-medium transition-all",
+                      resolution === res ? "border-cyan-500 bg-cyan-500/20 text-cyan-300" : "border-border bg-card/50 text-muted-foreground hover:border-border/80 hover:bg-muted/50")}>
+                    {res === "720p" ? "720p (Standard)" : "1080p (Pro)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Audio */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">🔊 Audio</label>
+              <button onClick={() => setAudioEnabled(!audioEnabled)}
+                className={cn("rounded-full border px-4 py-1.5 text-xs font-medium transition-all",
+                  audioEnabled ? "border-cyan-500 bg-cyan-500/20 text-cyan-300" : "border-border bg-card/50 text-muted-foreground")}>
+                {audioEnabled ? "🔊 Pertahankan audio dari video performa" : "🔇 Audio dimatikan"}
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Prompt */}
+          <div className="mb-6">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Instruksi Tambahan <span className="font-normal">(opsional, maks 2500 karakter)</span></label>
+            <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value.slice(0, 2500))} placeholder="Contoh: dansa dengan energik, latar belakang studio..." rows={2}
+              className="w-full resize-none rounded-xl border border-border bg-card/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+            <div className="mt-1 text-right text-[10px] text-muted-foreground">{customPrompt.length}/2500</div>
+          </div>
+
+          {/* Generate Button */}
+          <div className="mb-8 flex flex-col items-center gap-2">
+            <button onClick={handleGenerate} disabled={!allReady || isProcessing}
+              className={cn("flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-all",
+                allReady && !isProcessing ? "bg-gradient-to-r from-cyan-500 to-rose-500 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 cursor-pointer" : "bg-muted text-muted-foreground/40 cursor-not-allowed")}>
+              {isProcessing ? <><Loader2Icon className="h-4 w-4 animate-spin" /> {PHASE_LABELS[phase]}</> : <><SendIcon className="h-4 w-4" /> Generate Motion Control</>}
+            </button>
+            <span className="text-[11px] text-muted-foreground">
+              <span className="text-foreground/60 font-medium">{CREDIT_COST_RUNWAY} credits</span>
+            </span>
+          </div>
+
+          {/* Progress */}
+          {isProcessing && (
+            <div className="mb-8 flex flex-col items-center gap-3 animate-fade-up">
+              <LottieLoading size={120} />
+              <div className="text-center">
+                <p className="text-sm font-medium text-foreground/70">{PHASE_LABELS[phase]}</p>
+                <div className="mt-3 flex items-center gap-1.5 max-w-xs w-full">
+                  {(["uploading-image", "uploading-video", "generating"] as Phase[]).map((p, i) => (
+                    <div key={p} className={cn("h-1.5 flex-1 rounded-full transition-all", {
+                      "bg-cyan-500": (["uploading-image", "uploading-video", "generating"] as Phase[]).indexOf(phase) >= i,
+                      "bg-muted": (["uploading-image", "uploading-video", "generating"] as Phase[]).indexOf(phase) < i,
+                    })} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="mb-8 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              <span className="flex-1">{error}</span>
+              <button onClick={() => { setError(null); setPhase("idle") }} className="shrink-0 text-red-400/60 hover:text-red-400"><XIcon className="h-4 w-4" /></button>
+            </div>
+          )}
+
+          {/* Result */}
+          {generatedVideo && (
+            <div className="mb-8 animate-fade-up">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <PlayIcon className="h-4 w-4 text-cyan-400" /> Video Motion Control
+              </h2>
+              <div className="overflow-hidden rounded-2xl border border-border bg-card/50">
+                <div className="relative aspect-video max-h-[500px] mx-auto cursor-pointer" onClick={() => setPreviewModal(true)}>
+                  <video src={generatedVideo.url} className="h-full w-full object-contain bg-background" muted loop autoPlay playsInline />
+                </div>
+                <div className="flex justify-center gap-1 border-t border-border py-2">
+                  <button onClick={() => setPreviewModal(true)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                    <PlayIcon className="h-3.5 w-3.5" /> Fullscreen
+                  </button>
+                  <button onClick={() => handleDownload(generatedVideo.url, "motion-control-video.mp4")} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                    <DownloadIcon className="h-3.5 w-3.5" /> Download
+                  </button>
+                  <button
+                    disabled={saved || saving}
+                    onClick={async () => {
+                      setSaving(true)
+                      try {
+                        await fetch("/api/gallery/save", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ url: generatedVideo.url, type: "video", prompt: customPrompt, model: MODEL_ID, aspectRatio: "auto", sourceAction: "motion-control" }),
+                        })
+                        setSaved(true)
+                      } catch { /* ignore */ } finally { setSaving(false) }
+                    }}
+                    className={cn("flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition",
+                      saved ? "text-green-400" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+                  >
+                    {saved ? <><CheckIcon className="h-3.5 w-3.5" /> Tersimpan</> : saving ? <><Loader2Icon className="h-3.5 w-3.5 animate-spin" /> Menyimpan...</> : <><BookmarkIcon className="h-3.5 w-3.5" /> Simpan</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {previewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewUrl(null)}>
-          <button
-            type="button"
-            className="absolute right-4 top-4 rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-widest text-white hover:bg-white/10"
-            onClick={() => setPreviewUrl(null)}
-          >
-            Tutup
+      {/* Preview Modal */}
+      {previewModal && generatedVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md" onClick={() => setPreviewModal(false)}>
+          <button onClick={() => setPreviewModal(false)} className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 transition">
+            <XIcon className="h-5 w-5" />
           </button>
-          <video
-            src={previewUrl}
-            className="max-h-[86vh] max-w-[92vw]"
-            controls
-            autoPlay
-            playsInline
-            onClick={(event) => event.stopPropagation()}
-          />
+          <div className="relative max-h-[90vh] max-w-[90vw] w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <video src={generatedVideo.url} className="max-h-[80vh] w-full rounded-2xl object-contain" controls autoPlay playsInline />
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <button onClick={() => handleDownload(generatedVideo.url, "motion-control-video.mp4")} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm hover:bg-white/20">
+                <DownloadIcon className="h-4 w-4" /> Download
+              </button>
+              <button onClick={() => setPreviewModal(false)} className="flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm text-white backdrop-blur-sm hover:bg-white/20">
+                <XIcon className="h-4 w-4" /> Tutup
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
