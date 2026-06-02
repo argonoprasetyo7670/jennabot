@@ -108,7 +108,7 @@ export default function SeedancePage() {
   }
 
   const handleGenerate = async () => {
-    if (isGenerating) return
+    if (isGenerating || (!prompt.trim() && referenceFiles.length === 0)) return
     setIsGenerating(true)
     setError(null)
     setGeneratedVideos([])
@@ -193,9 +193,10 @@ export default function SeedancePage() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleGenerate() }
+    if (e.key === "Enter" && !e.shiftKey && (prompt.trim() || referenceFiles.length > 0)) { e.preventDefault(); handleGenerate() }
   }
 
+  const canGenerate = !isGenerating && (prompt.trim().length > 0 || referenceFiles.length > 0)
   const isEmpty = generatedVideos.length === 0 && !isGenerating
 
   return (
@@ -443,9 +444,9 @@ export default function SeedancePage() {
                 )}
               </div>
 
-              <button onClick={handleGenerate} disabled={isGenerating}
+              <button onClick={handleGenerate} disabled={!canGenerate}
                 className={cn("flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                  !isGenerating ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40" : "bg-muted text-muted-foreground/40 cursor-not-allowed")}>
+                  canGenerate ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 cursor-pointer" : "bg-muted text-muted-foreground/40 cursor-not-allowed")}>
                 {isGenerating ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
               </button>
             </div>

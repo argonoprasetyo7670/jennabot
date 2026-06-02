@@ -21,6 +21,51 @@ setInterval(() => {
 }, 5 * 60_000)
 
 /**
+ * Map HTTP status codes & raw error text to user-friendly Indonesian messages.
+ */
+function friendlyGenerateError(status: number, rawError: string): string {
+  const lower = rawError.toLowerCase()
+
+  if (status === 402 || lower.includes("insufficient") || lower.includes("credit"))
+    return "Kredit tidak cukup untuk membuat video."
+  if (status === 413 || lower.includes("too large") || lower.includes("entity too large"))
+    return "File referensi terlalu besar. Coba gunakan file yang lebih kecil."
+  if (status === 429 || lower.includes("rate limit") || lower.includes("too many") || lower.includes("throttl"))
+    return "Server sedang sibuk. Tunggu beberapa saat lalu coba lagi."
+  if (status === 401 || status === 403)
+    return "Sesi login habis. Silakan refresh halaman dan login ulang."
+  if (status === 400 || lower.includes("invalid") || lower.includes("bad request"))
+    return "Parameter tidak valid. Pastikan prompt dan referensi sudah benar."
+  if (status === 503 || status === 502 || lower.includes("unavailable") || lower.includes("maintenance"))
+    return "Layanan video generation sedang maintenance. Coba lagi nanti."
+  if (lower.includes("timeout") || lower.includes("timed out"))
+    return "Proses timeout. Pastikan koneksi internet stabil dan coba lagi."
+  if (lower.includes("content policy") || lower.includes("moderation") || lower.includes("safety"))
+    return "Konten tidak diizinkan oleh kebijakan keamanan AI. Coba prompt yang berbeda."
+  if (lower.includes("quota") || lower.includes("limit reached"))
+    return "Batas penggunaan harian tercapai. Coba lagi besok."
+  if (status >= 500)
+    return "Terjadi kesalahan pada server. Coba lagi dalam beberapa saat."
+
+  return "Gagal membuat video. Silakan coba lagi."
+}
+
+function friendlyPollError(status: number, rawError: string): string {
+  const lower = rawError.toLowerCase()
+
+  if (lower.includes("content policy") || lower.includes("moderation") || lower.includes("safety"))
+    return "Video ditolak oleh kebijakan keamanan AI. Coba prompt yang berbeda."
+  if (lower.includes("failed") || lower.includes("error"))
+    return "Pembuatan video gagal. Silakan coba lagi dengan prompt atau referensi yang berbeda."
+  if (status === 429 || lower.includes("throttl"))
+    return "Server sedang sibuk. Video masih diproses, silakan tunggu."
+  if (status >= 500)
+    return "Terjadi gangguan sementara. Coba lagi dalam beberapa saat."
+
+  return "Pembuatan video gagal. Silakan coba lagi."
+}
+
+/**
  * Deduct credits for a user.
  */
 async function deductCredits(userId: string, amount: number, feature: string): Promise<number> {
@@ -57,21 +102,32 @@ async function deductCredits(userId: string, amount: number, feature: string): P
 }
 
 /**
+ * Safely parse a fetch response — returns parsed JSON or null + logs raw text.
+ */
+async function safeParseResponse(response: Response, context: string): Promise<Record<string, unknown> | null> {
+  const text = await response.text()
+  try {
+    return JSON.parse(text)
+  } catch {
+    console.error(`[runway/${context}] Non-JSON response (${response.status}):`, text.slice(0, 300))
+    return null
+  }
+}
+
+/**
  * POST /api/runway/video-generate
  * Start a Runway video generation via POST /videos/create.
  * Returns taskId immediately — client polls GET for results.
- *
- * Supported models: seedance-2, kling-3.0-motion-control
  */
 export async function POST(req: NextRequest) {
   const apiToken = process.env.USEAPI_TOKEN
   if (!apiToken) {
-    return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
+    return NextResponse.json({ error: "Layanan tidak tersedia saat ini." }, { status: 500 })
   }
 
   const session = await auth()
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Silakan login terlebih dahulu." }, { status: 401 })
   }
 
   try {
@@ -84,7 +140,7 @@ export async function POST(req: NextRequest) {
     } = body
 
     if (!model) {
-      return NextResponse.json({ error: "model is required" }, { status: 400 })
+      return NextResponse.json({ error: "Model video belum dipilih." }, { status: 400 })
     }
 
     // Check credit balance
@@ -93,7 +149,7 @@ export async function POST(req: NextRequest) {
 
     if (currentBalance < CREDIT_COST_RUNWAY) {
       return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_RUNWAY}, saldo: ${currentBalance}` },
+        { error: `Kredit tidak cukup. Dibutuhkan ${CREDIT_COST_RUNWAY} kredit, saldo Anda: ${currentBalance}.` },
         { status: 402 }
       )
     }
@@ -139,12 +195,20 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(payload),
     })
 
-    const data = await response.json()
+    const data = await safeParseResponse(response, "video-generate-post")
+
+    if (!data) {
+      return NextResponse.json(
+        { error: friendlyGenerateError(response.status, "non-json") },
+        { status: response.status || 500 }
+      )
+    }
 
     if (!response.ok) {
-      console.error(`[runway/video-generate] Error ${response.status}:`, JSON.stringify(data))
+      const rawError = (data.error as string) || JSON.stringify(data)
+      console.error(`[runway/video-generate] Error ${response.status}:`, rawError)
       return NextResponse.json(
-        { error: data.error || `API error: ${response.status}` },
+        { error: friendlyGenerateError(response.status, rawError) },
         { status: response.status }
       )
     }
@@ -153,7 +217,7 @@ export async function POST(req: NextRequest) {
     const taskId = data.task?.taskId || data.taskId
     if (!taskId) {
       console.error("[runway/video-generate] No taskId in response:", data)
-      return NextResponse.json({ error: "No taskId returned from Runway" }, { status: 500 })
+      return NextResponse.json({ error: "Gagal memulai pembuatan video. Silakan coba lagi." }, { status: 500 })
     }
 
     console.log(`[runway/video-generate] Task started: ${taskId}`)
@@ -164,7 +228,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error("[runway/video-generate] Error:", error)
-    return NextResponse.json({ error: "Failed to start video generation" }, { status: 500 })
+    return NextResponse.json({ error: "Gagal memulai pembuatan video. Silakan coba lagi." }, { status: 500 })
   }
 }
 
@@ -177,17 +241,17 @@ export async function GET(req: NextRequest) {
   const taskId = req.nextUrl.searchParams.get("taskId")
 
   if (!taskId) {
-    return NextResponse.json({ error: "taskId parameter is required" }, { status: 400 })
+    return NextResponse.json({ error: "Parameter tidak lengkap." }, { status: 400 })
   }
 
   const apiToken = process.env.USEAPI_TOKEN
   if (!apiToken) {
-    return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
+    return NextResponse.json({ error: "Layanan tidak tersedia saat ini." }, { status: 500 })
   }
 
   const session = await auth()
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Silakan login terlebih dahulu." }, { status: 401 })
   }
 
   try {
@@ -196,21 +260,32 @@ export async function GET(req: NextRequest) {
       headers: { Authorization: `Bearer ${apiToken}` },
     })
 
+    const data = await safeParseResponse(res, "video-generate-poll")
+
+    if (!data) {
+      // Non-JSON response — if 404, task may still be queued
+      if (res.status === 404 || res.status < 500) {
+        return NextResponse.json({ taskId, status: "processing" })
+      }
+      return NextResponse.json(
+        { taskId, status: "error", error: "Terjadi gangguan sementara. Coba lagi." },
+        { status: 500 }
+      )
+    }
+
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}))
-      console.error(`[runway/video-generate] Poll error ${res.status} for ${taskId}:`, errData)
+      console.error(`[runway/video-generate] Poll error ${res.status} for ${taskId}:`, data)
 
       if (res.status === 404) {
         return NextResponse.json({ taskId, status: "processing" })
       }
 
       return NextResponse.json(
-        { taskId, status: "error", error: (errData as Record<string, string>).error || `Poll failed: ${res.status}` },
+        { taskId, status: "error", error: friendlyPollError(res.status, (data.error as string) || "") },
         { status: 500 }
       )
     }
 
-    const data = await res.json() as Record<string, unknown>
     const taskStatus = data.status as string
 
     // Still processing
@@ -226,8 +301,10 @@ export async function GET(req: NextRequest) {
 
     // Failed
     if (taskStatus === "FAILED" || taskStatus === "CANCELLED") {
+      const rawError = (data.error as string) || ""
+      console.error(`[runway/video-generate] Task ${taskId} failed:`, rawError)
       return NextResponse.json(
-        { taskId, status: "error", error: (data.error as string) || "Runway generation failed" },
+        { taskId, status: "error", error: friendlyPollError(500, rawError) },
         { status: 500 }
       )
     }
@@ -247,7 +324,7 @@ export async function GET(req: NextRequest) {
           metadata: a.metadata as Record<string, unknown> | undefined,
         }))
 
-      // If no videos found in artifacts, try all artifacts (some may be images from frames endpoint)
+      // If no videos found in artifacts, try all artifacts
       const results = videos.length > 0 ? videos : artifacts.map((a) => ({
         url: a.url as string,
         assetId: a.assetId as string,
@@ -279,7 +356,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error(`[runway/video-generate] Poll error for ${taskId}:`, error)
     return NextResponse.json(
-      { taskId, status: "error", error: "Failed to check task status" },
+      { taskId, status: "error", error: "Terjadi gangguan koneksi. Coba lagi." },
       { status: 500 }
     )
   }
