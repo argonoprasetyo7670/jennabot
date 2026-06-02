@@ -136,7 +136,7 @@ export async function generateRunwayVideo(
 
     try {
       const pollRes = await fetch(
-        `/api/runway/video-generate?taskId=${encodeURIComponent(taskId)}`
+        `/api/runway/video-generate?taskId=${taskId}`
       )
       const pollData = await pollRes.json()
 
