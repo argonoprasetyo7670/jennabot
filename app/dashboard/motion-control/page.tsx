@@ -32,7 +32,7 @@ export default function MotionControlPage() {
   const [characterImage, setCharacterImage] = useState<{ file: File; preview: string } | null>(null)
   const [performanceVideo, setPerformanceVideo] = useState<{ file: File; preview: string } | null>(null)
   const [customPrompt, setCustomPrompt] = useState("")
-  const [orientation, setOrientation] = useState<"image" | "video">("image")
+  const [orientation, setOrientation] = useState<"image" | "video">("video")
   const [audioEnabled, setAudioEnabled] = useState(true)
   const [resolution, setResolution] = useState<"720p" | "1080p">("720p")
   const [phase, setPhase] = useState<Phase>("idle")
@@ -69,8 +69,33 @@ export default function MotionControlPage() {
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (performanceVideo) URL.revokeObjectURL(performanceVideo.preview)
-    setPerformanceVideo({ file, preview: URL.createObjectURL(file) })
+
+    // Validate video duration
+    const videoEl = document.createElement("video")
+    videoEl.preload = "metadata"
+    videoEl.onloadedmetadata = () => {
+      URL.revokeObjectURL(videoEl.src)
+      const dur = videoEl.duration
+
+      if (orientation === "image" && dur > 10) {
+        setError(`Video terlalu panjang (${Math.round(dur)}s). Untuk orientasi "Ikuti Gambar", maksimal 10 detik.`)
+        return
+      }
+      if (dur > 30) {
+        setError(`Video terlalu panjang (${Math.round(dur)}s). Maksimal 30 detik.`)
+        return
+      }
+
+      if (performanceVideo) URL.revokeObjectURL(performanceVideo.preview)
+      setPerformanceVideo({ file, preview: URL.createObjectURL(file) })
+    }
+    videoEl.onerror = () => {
+      URL.revokeObjectURL(videoEl.src)
+      // Can't read metadata, let it through and let the API validate
+      if (performanceVideo) URL.revokeObjectURL(performanceVideo.preview)
+      setPerformanceVideo({ file, preview: URL.createObjectURL(file) })
+    }
+    videoEl.src = URL.createObjectURL(file)
     if (videoInputRef.current) videoInputRef.current.value = ""
   }
 
@@ -209,7 +234,7 @@ export default function MotionControlPage() {
                 <button onClick={() => videoInputRef.current?.click()} className="flex aspect-[3/4] w-full max-w-[240px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-rose-500/40 bg-card/50 transition-all hover:scale-[1.02] hover:border-rose-500/60">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400"><VideoIcon className="h-6 w-6" /></div>
                   <p className="text-xs font-medium text-foreground/70">Upload Video Performa</p>
-                  <p className="text-[10px] text-muted-foreground/50">3–30 detik</p>
+                  <p className="text-[10px] text-muted-foreground/50">{orientation === "image" ? "Maks 10 detik" : "3–30 detik"}</p>
                 </button>
               )}
             </div>
@@ -230,7 +255,9 @@ export default function MotionControlPage() {
                 ))}
               </div>
               <p className="mt-1 text-[10px] text-muted-foreground/60">
-                {orientation === "image" ? "Orientasi karakter mengikuti pose di gambar" : "Orientasi karakter mengikuti pose di video performa"}
+                {orientation === "image"
+                  ? "Orientasi karakter mengikuti pose di gambar. ⚠️ Video referensi harus di bawah 10 detik."
+                  : "Orientasi karakter mengikuti pose di video performa. Video hingga 30 detik."}
               </p>
             </div>
 
