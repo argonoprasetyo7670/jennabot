@@ -24,8 +24,8 @@ import { downloadVideo } from "@/lib/download"
 import type { VideoAspectRatio, VideoDuration, GeneratedVideo } from "@/lib/api/google-flow"
 
 /* ─── Constants ─── */
-const MODEL_ID = "veo-3.1-fast" as const
-const MODEL_NAME = "Veo 3.1 Fast"
+const MODEL_ID = "veo-3.1-lite-low-priority" as const
+const MODEL_NAME = "Veo 3.1"
 const ASPECT_RATIOS: VideoAspectRatio[] = ["landscape", "portrait"]
 const VIDEO_COUNTS = [1, 2, 3, 4]
 const DURATIONS: VideoDuration[] = [4, 6, 8]
@@ -45,7 +45,7 @@ interface GalleryItem {
 }
 
 export default function AIVideoGeneratorPage() {
-  const [selectedRatio, setSelectedRatio] = useState(0) // landscape
+  const [selectedRatio, setSelectedRatio] = useState(1) // portrait default
   const [selectedCount, setSelectedCount] = useState(0) // 1
   const [selectedDuration, setSelectedDuration] = useState(2) // 8s
   const [showSettings, setShowSettings] = useState(false)

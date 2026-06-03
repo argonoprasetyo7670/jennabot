@@ -216,7 +216,7 @@ export default function ReviewProductPage() {
       updateJob(jobId, { progress: "Membuat video (60-180 detik)..." })
       console.log("[review-product] Starting video generation with startImage:", img.mediaGenerationId)
       const vidResult = await generateVideos({
-        prompt: videoPrompt, model: "veo-3.1-fast", aspectRatio: "portrait",
+        prompt: videoPrompt, model: "veo-3.1-lite-low-priority", aspectRatio: "portrait",
         duration: 8, count: 1,
         startImage: img.mediaGenerationId,
         email,
@@ -477,7 +477,7 @@ export default function ReviewProductPage() {
                           try {
                             await fetch("/api/gallery/save", {
                               method: "POST", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ url: generatedVideo.url, type: "video", prompt: customPrompt, model: "veo-3.1-fast", aspectRatio: "9:16" }),
+                              body: JSON.stringify({ url: generatedVideo.url, type: "video", prompt: customPrompt, model: "veo-3.1-lite-low-priority", aspectRatio: "9:16" }),
                             })
                             setSavedVideo(true)
                           } catch { /* ignore */ } finally { setSavingVideo(false) }

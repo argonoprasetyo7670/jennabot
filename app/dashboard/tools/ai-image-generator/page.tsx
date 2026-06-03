@@ -47,9 +47,9 @@ interface GalleryItem {
 }
 
 export default function AIImageGeneratorPage() {
-  const [selectedRatio, setSelectedRatio] = useState(2)
+  const [selectedRatio, setSelectedRatio] = useState(4) // 9:16 default
   const [selectedCount, setSelectedCount] = useState(1)
-  const [selectedModel, setSelectedModel] = useState(1) // nano-banana-2 default
+  const [selectedModel, setSelectedModel] = useState(2) // nano-banana-pro default
   const [showModelDropdown, setShowModelDropdown] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showPlusMenu, setShowPlusMenu] = useState(false)
