@@ -385,9 +385,11 @@ function JobItem({
   )
 }
 
-/* ─── Job Preview Modal (full-screen image/video viewer) ─── */
+/* ─── Job Preview Modal (full-screen image/video viewer with gallery save) ─── */
 function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = React.useState(0)
+  const [savedItems, setSavedItems] = React.useState<Set<string>>(new Set())
+  const [isSaving, setIsSaving] = React.useState(false)
   const isVideo = job.type === "video"
   const images = job.images
   const videos = job.videos
@@ -429,8 +431,42 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
     }
   }
 
+  const handleSaveToGallery = async () => {
+    const currentUrl = isVideo ? videos[currentIndex]?.url : images[currentIndex]?.url
+    if (!currentUrl || isSaving) return
+
+    const itemKey = `${isVideo ? "v" : "i"}-${currentIndex}`
+    if (savedItems.has(itemKey)) return
+
+    setIsSaving(true)
+    try {
+      const currentItem = isVideo ? videos[currentIndex] : images[currentIndex]
+      const res = await fetch("/api/gallery/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: currentUrl,
+          type: isVideo ? "video" : "image",
+          prompt: job.prompt,
+          model: job.model,
+          aspectRatio: "9:16",
+          mediaGenerationId: (currentItem as { mediaGenerationId?: string })?.mediaGenerationId || undefined,
+        }),
+      })
+      if (res.ok) {
+        setSavedItems((prev) => new Set(prev).add(itemKey))
+      }
+    } catch (err) {
+      console.error("Failed to save to gallery:", err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const currentUrl = isVideo ? videos[currentIndex]?.url : images[currentIndex]?.url
   const fileExt = isVideo ? "mp4" : "png"
+  const currentItemKey = `${isVideo ? "v" : "i"}-${currentIndex}`
+  const isCurrentSaved = savedItems.has(currentItemKey)
 
   return (
     <div
@@ -549,11 +585,33 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
           Download
         </button>
         <button
-          onClick={() => alert(isVideo ? "Video akan disimpan ke Gallery (coming soon)" : "Gambar akan disimpan ke Gallery (coming soon)")}
-          className="flex h-11 items-center gap-2 rounded-xl bg-white/10 px-5 text-sm text-white/90 transition hover:bg-white/20 active:scale-95"
+          onClick={handleSaveToGallery}
+          disabled={isSaving || isCurrentSaved}
+          className={cn(
+            "flex h-11 items-center gap-2 rounded-xl px-5 text-sm transition active:scale-95",
+            isCurrentSaved
+              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+              : isSaving
+                ? "bg-white/5 text-white/50"
+                : "bg-white/10 text-white/90 hover:bg-white/20"
+          )}
         >
-          <ImagePlusIcon className="h-4 w-4" />
-          Gallery
+          {isCurrentSaved ? (
+            <>
+              <CheckCircle2Icon className="h-4 w-4" />
+              Tersimpan
+            </>
+          ) : isSaving ? (
+            <>
+              <Loader2Icon className="h-4 w-4 animate-spin" />
+              Menyimpan...
+            </>
+          ) : (
+            <>
+              <ImagePlusIcon className="h-4 w-4" />
+              Simpan ke Gallery
+            </>
+          )}
         </button>
         <button
           onClick={onClose}

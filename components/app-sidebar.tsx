@@ -97,7 +97,7 @@ const navItems: NavItem[] = [
       { title: "Motion Control", url: "/dashboard/motion-control" },
       // { title: "Storyboard", url: "/dashboard/storyboard" },
       // { title: "Scene Builder", url: "/dashboard/scene-builder" },
-      // { title: "Video Template", url: "/dashboard/video-template" },
+      { title: "Video Template", url: "/dashboard/video-template" },
       // { title: "TikTok Hook Generator", url: "/dashboard/tiktok-hook-gen" },
       // { title: "Extend Video", url: "/dashboard/extend-video" },
       // { title: "Merge Videos", url: "/dashboard/concatenate-video" },

@@ -2,21 +2,6 @@
 
 > Dokumentasi ini ditujukan untuk AI agent/developer agar memahami arsitektur, konvensi, dan cara kerja fitur **Video Template** di project ini.
 
----
-
-## 🏗️ Tech Stack
-
-| Layer | Teknologi |
-|---|---|
-| Framework | Next.js 14 (App Router, `"use client"`) |
-| Language | TypeScript |
-| Styling | Tailwind CSS + shadcn/ui components |
-| Auth | NextAuth (JWT) |
-| Database | Prisma + PostgreSQL |
-| AI Models | `nano-banana-pro` (image generation), `veo-3.1-fast` (video generation) |
-| State | React hooks (useState, useCallback) — no external state library |
-
----
 
 ## 📁 File Structure — Video Template
 
@@ -235,6 +220,28 @@ Semua template terdaftar di `lib/templates/index.ts`:
 
 ---
 
+## 🗄️ Storage Decision: File-based (bukan Database)
+
+Template disimpan di file TypeScript (`lib/templates/*.ts`), **bukan di database**. Keputusan ini diambil karena:
+
+1. **Prompt builders adalah functions** — `buildImagePrompt()` dan `buildVideoPrompt()` mengandung logic per kategori produk yang tidak bisa di-serialize ke DB tanpa membuat template engine
+2. **Type safety** — Template punya nested structure (`imagePrompt.pose`, `videoPrompt.camera.start`, `action_sequence[]`) yang di-validate TypeScript saat compile
+3. **Git versioning** — Setiap perubahan prompt ke-track di git dan bisa di-rollback
+4. **Zero latency** — Template available langsung tanpa query DB
+5. **Simple to add** — 1 file + register di `index.ts` = selesai, tanpa migration
+
+### Kapan Perlu Migrasi ke Database?
+
+Pertimbangkan **hybrid approach** jika:
+- Admin/non-developer perlu CRUD template via dashboard
+- Reseller perlu custom template per brand
+- Template count > 50 dan sering berubah
+- Perlu A/B testing prompt antar template
+
+**Hybrid**: metadata (name, icon, description) → DB | prompt builders (logic) → tetap di TS, di-map by template ID
+
+---
+
 ## 🔑 Konsep Penting
 
 ### Konsistensi Visual Antar Scene
@@ -258,6 +265,219 @@ Setelah video selesai, user bisa upscale ke resolusi 4K via `upscaleVideo` actio
 
 ---
 
+## 🚨 Error Handling & Recovery Flow
+
+### Error Points & Behavior
+
+```
+Pipeline: Upload → [Scene 1: Image → Save → Video] → [Scene 2: Image → Save → Video] → ... → [Scene 5]
+                 ↑          ↑            ↑                   ↑
+              Error A     Error B      Error C             Error D
+```
+
+| Error | Titik Gagal | Behavior | Credits |
+|-------|------------|----------|--------|
+| **A — Upload Gagal** | Upload 3 gambar awal | Semua scene batal. Toast error. Status: `failed`. | ❌ Tidak ada deduction |
+| **B — Image Gen Gagal** | Generate image scene N | Scene N status → `failed`. **Scene N+1 dst tetap jalan** (pakai fallback reference). | ❌ Tidak ada deduction untuk scene gagal |
+| **C — Video Gen Gagal** | Generate video scene N | Scene N: image ada, video kosong. Status → `failed`. Scene berikutnya tetap lanjut. | ✅ Image sudah di-deduct, video tidak |
+| **D — Mid-Pipeline Gagal** | Scene 3 gagal, scene 1-2 sudah done | Scene 1-2 tetap tersimpan. Scene 3 bisa di-regenerate manual. | ✅ Hanya scene sukses yang di-deduct |
+
+### Detailed Error Scenarios
+
+#### 1. Upload Failure (Error A)
+```
+User click Generate
+  → Upload 3 gambar ke /api/internal/upload-image
+  → Salah satu gagal (network error, file too large, server error)
+  → Toast: "Gagal mengupload gambar. Silakan coba lagi."
+  → Semua scene status tetap 'pending'
+  → User bisa retry tanpa re-upload gambar (files masih di state)
+```
+
+#### 2. Image Generation Failure (Error B)
+```
+Scene N image generation gagal
+  → Scene N status → 'failed', error message disimpan
+  → Scene N+1:
+    ├── Kalau N=1 gagal → Scene 2 pakai [modelId, backgroundId, productId] (fallback ke original refs)
+    └── Kalau N>1 gagal → Scene N+1 pakai previousSceneImageId dari scene terakhir yang sukses
+  → User bisa klik "Regenerate Image" untuk retry scene yang gagal
+```
+
+#### 3. Video Generation Failure (Error C)
+```
+Scene N video generation gagal (timeout, API error, captcha)
+  → Scene N: image tersimpan, video kosong
+  → Status → 'failed' (atau partial: image done, video failed)
+  → User bisa klik "Regenerate Video" → retry hanya video, pakai image existing
+  → Credits: image sudah di-deduct (5), video TIDAK di-deduct (20)
+```
+
+#### 4. Session Expiry
+```
+API response mengandung { shouldLogout: true }
+  → Toast warning: "Sesi Anda telah berakhir"
+  → Auto-reload page setelah 2 detik
+  → Progress hilang — scene yang sudah selesai tetap di server tapi state lokal hilang
+```
+
+### Regeneration After Failure
+
+User punya 3 opsi regenerate per scene (tersedia di `SceneResults` component):
+
+| Button | Fungsi | Kapan Dipakai |
+|--------|--------|---------------|
+| 🔄 Regenerate All | Re-generate image + video | Hasil keduanya jelek |
+| 🖼️ Regenerate Image | Re-generate image saja | Gambar jelek, belum ada video |
+| 🎬 Regenerate Video | Re-generate video saja (pakai image existing) | Gambar bagus, video jelek |
+
+> **Penting:** Regenerate image di scene N **TIDAK** otomatis regenerate scene N+1 dst. Konsistensi antar scene bisa terpengaruh jika image berubah.
+
+---
+
+## 💰 Credit Cost & Billing
+
+### Cost Constants
+
+| Operation | Cost | Constant | Source |
+|-----------|------|----------|--------|
+| Image Generation | 5 credits | `CREDIT_COST_IMAGE` | `contexts/generation-queue.tsx` |
+| Video Generation | 20 credits | `CREDIT_COST_VIDEO` | `contexts/generation-queue.tsx` |
+| Upscale to 4K | TBD | — | Belum diimplementasi di template |
+
+### Cost Per Scene
+
+| Step | Credits | Notes |
+|------|---------|-------|
+| Generate Image | 5 | 1 image per scene |
+| Generate Video | 20 | 1 video per scene (I2V) |
+| **Subtotal per scene** | **25** | Image + Video |
+
+### Cost Per Template (5 Scenes)
+
+| Scenario | Calculation | Total Credits |
+|----------|-------------|---------------|
+| Full template (happy path) | 5 scenes × (5 + 20) | **125 credits** |
+| Template tanpa video | 5 scenes × 5 | **25 credits** |
+| Regenerate 1 scene (image + video) | 1 × (5 + 20) | **+25 credits** |
+| Regenerate 1 scene (video only) | 1 × 20 | **+20 credits** |
+| Upscale 1 video to 4K | TBD | **TBD** |
+
+### Deduction Flow
+
+```
+Per Scene:
+  Image Gen → API call → Success?
+    ├── ✅ Yes → Deduct 5 credits → POST /api/credits { amount: 5, feature: 'video-template' }
+    │           → dispatch 'credits-updated' event
+    └── ❌ No  → No deduction
+
+  Video Gen → API call → Success?
+    ├── ✅ Yes → Deduct 20 credits → POST /api/credits { amount: 20, feature: 'video-template' }
+    │           → dispatch 'credits-updated' event
+    └── ❌ No  → No deduction, image credits tetap terpakai
+```
+
+### Pre-Generation Validation
+
+Sebelum generate, hook **harus** cek saldo cukup:
+```typescript
+// Minimum: semua scene image + video
+const totalCost = template.scenes.length * (CREDIT_COST_IMAGE + CREDIT_COST_VIDEO)
+if (balance < totalCost) {
+  toast({ title: "Kredit tidak cukup", description: `Butuh ${totalCost} credits, saldo: ${balance}` })
+  return
+}
+```
+
+### UI Display
+
+Tampilkan estimasi biaya di `TemplateForm` sebelum tombol Generate:
+```
+"Pembuatan 5 scene akan menggunakan ±125 credits (5 × 25 credits/scene)"
+```
+
+---
+
+## ✅ Success Flow: Save & Download
+
+### Per-Scene Result Actions
+
+Setiap scene yang berhasil menampilkan aksi berikut di `SceneResults` component:
+
+| Action | Target | Method |
+|--------|--------|--------|
+| 👁️ Preview | Image & Video | Inline preview (9:16 portrait) |
+| 💾 Save to Gallery | Image | `POST /api/gallery/save` → `sourceAction: "video-template"` |
+| 💾 Save to Gallery | Video | `POST /api/gallery/save` → `sourceAction: "video-template"` |
+| ⬇️ Download Image | Image | `downloadImage()` dari `lib/download.ts` (proxy via `/api/ai/image-download`) |
+| ⬇️ Download Video | Video | `downloadVideo()` dari `lib/download.ts` (proxy via `/api/ai/video-download`) |
+| 🔄 Regenerate | Image/Video/Both | Lihat section Regeneration |
+| 🔍 Edit Prompt | Image/Video prompt | Toggle inline editor, lalu regenerate |
+| 📝 Edit Dialogue | Dialogue text | Toggle inline editor per scene |
+| 📐 Upscale 4K | Video | `upscaleVideo` action via `/api/internal/media/actions` |
+
+### Save to Gallery Pattern
+
+```typescript
+// Contoh save image ke gallery
+const res = await fetch("/api/gallery/save", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    url: scene.image.fifeUrl,
+    type: "image",
+    prompt: scene.imagePrompt,
+    model: "nano-banana-pro",
+    aspectRatio: "9:16",
+    sourceAction: "video-template",
+    mediaGenerationId: scene.image.mediaGenerationId,
+  }),
+})
+
+// Contoh save video ke gallery
+const res = await fetch("/api/gallery/save", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    url: scene.video.fifeUrl,
+    type: "video",
+    prompt: scene.videoPrompt,
+    model: "veo-3.1-fast",
+    aspectRatio: "9:16",
+    sourceAction: "video-template",
+    mediaGenerationId: scene.video.mediaGenerationId,
+  }),
+})
+```
+
+### Download Pattern
+
+Semua download menggunakan server proxy karena URL FIFE cross-origin (Safari/iOS tidak support `<a download>`):
+
+```typescript
+import { downloadImage, downloadVideo } from "@/lib/download"
+
+// Download image
+await downloadImage(scene.image.fifeUrl, `scene-${scene.scene}-image.jpg`)
+
+// Download video
+await downloadVideo(scene.video.fifeUrl, `scene-${scene.scene}-video.mp4`)
+```
+
+### Duplikat Detection
+
+`/api/gallery/save` melakukan duplikat detection berdasarkan URL. Jika sudah tersimpan, response tetap `{ success: true }` tanpa membuat record baru.
+
+### Save Button States
+
+```
+Simpan → Menyimpan... → Tersimpan ✅
+  (idle)   (loading)     (saved, disabled)
+```
+
+---
+
 ## ⚠️ Gotchas & Known Patterns
 
 1. **`deviceId` selalu `""`** — saat ini hardcoded empty string di hook.
@@ -267,7 +487,9 @@ Setelah video selesai, user bisa upscale ke resolusi 4K via `upscaleVideo` actio
 5. **Semua proses sequential** per scene (bukan parallel) — karena scene berikutnya butuh `previousSceneImageId` dari scene sebelumnya.
 6. **Aspect ratio selalu `portrait` (9:16)** — untuk format TikTok/Reels/Shorts.
 7. **Feature gate**: fitur `video-template` termasuk dalam `enabledFeatures` default di Prisma schema.
-8. **Download** menggunakan `downloadMediaFile()` dari `lib/download-media` — bukan link biasa karena URL FIFE butuh proxy.
+8. **Download** menggunakan `downloadImage()` / `downloadVideo()` dari `lib/download.ts` — bukan link biasa karena URL FIFE butuh proxy.
+9. **API route naming**: Dokumen ini menggunakan `/api/internal/*` routes yang **belum ada di codebase**. Saat implementasi, perlu dibuat baru ATAU di-map ke existing routes (`/api/ai/image-upload`, `/api/ai/image-generate`, `/api/ai/video-generate`, dll). Lihat AGENTS.md section 2.2 untuk daftar routes yang sudah ada.
+10. **Credit cost tinggi**: 1 template penuh = 125 credits. Pastikan ada warning/konfirmasi sebelum user generate.
 
 ---
 
