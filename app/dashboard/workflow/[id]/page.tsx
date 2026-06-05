@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef, use } from "react"
+import { useState, useCallback, useEffect, useRef, use, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { cn } from "@/lib/utils"
@@ -66,6 +66,9 @@ import {
   CameraIcon,
   MonitorIcon,
   ClipboardPasteIcon,
+  Undo2Icon,
+  Redo2Icon,
+  HashIcon,
 } from "lucide-react"
 import { generateImages, uploadImageAsset, type GeneratedImage, type UploadAssetResult, generateVideos, type GeneratedVideo } from "@/lib/api/google-flow"
 import { downloadImage, downloadVideo } from "@/lib/download"
@@ -74,6 +77,9 @@ import {
   updateWorkflow,
   type WorkflowData,
 } from "../_components/workflow-store"
+import { validateWorkflow } from "../_components/workflow-validator"
+import { estimateWorkflowCredits } from "../_components/workflow-runner"
+import { useWorkflowHistory } from "@/hooks/use-workflow-history"
 
 /* ═══════════════════════════════════════════════════════
    Custom Node Components
@@ -543,6 +549,20 @@ function ImageGenNodeComponent({ data, id: nodeId }: NodeProps) {
             </select>
           </div>
           <div className="h-4 w-px bg-border/50" />
+          <div className="flex items-center gap-1">
+            <HashIcon className="h-3 w-3 text-muted-foreground" />
+            <select
+              value={(nodeData.count as number) || 1}
+              onChange={e => updateNodeData(nodeId, { count: Number(e.target.value) })}
+              disabled={isGenerating}
+              className="bg-transparent text-xs text-foreground focus:outline-none disabled:opacity-50 cursor-pointer"
+            >
+              <option value={1}>×1</option>
+              <option value={2}>×2</option>
+              <option value={4}>×4</option>
+            </select>
+          </div>
+          <div className="h-4 w-px bg-border/50" />
           <button className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition" title="More options">
             <MoreHorizontalIcon className="h-3.5 w-3.5" />
           </button>
@@ -811,19 +831,82 @@ function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
 }
 
 /* ─── Gallery (Save) Node ─── */
-function GalleryNodeComponent({ data }: NodeProps) {
+function GalleryNodeComponent({ data, id: nodeId }: NodeProps) {
+  const connectedMedia = useConnectedValue("media") as string | null
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "done" | "error">("idle")
+  const { updateNodeData } = useReactFlow()
+  const prevMediaRef = useRef<string | null>(null)
+
+  const handleSave = useCallback(async (url: string) => {
+    setSaveStatus("saving")
+    updateNodeData(nodeId, { status: "running" })
+    try {
+      const isVideo = url.includes("video") || url.includes(".mp4") || url.includes("mode=inline")
+      await fetch("/api/gallery/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, prompt: "Workflow auto-save", type: isVideo ? "video" : "image" }),
+      })
+      setSaveStatus("done")
+      updateNodeData(nodeId, { status: "done" })
+    } catch {
+      setSaveStatus("error")
+      updateNodeData(nodeId, { status: "error" })
+    }
+  }, [nodeId, updateNodeData])
+
+  // Auto-save when new media is connected
+  useEffect(() => {
+    if (connectedMedia && connectedMedia !== prevMediaRef.current) {
+      prevMediaRef.current = connectedMedia
+      handleSave(connectedMedia)
+    }
+  }, [connectedMedia, handleSave])
+
+  const mediaPreview = connectedMedia || (data.media as string | undefined)
+  const isVideo = mediaPreview?.includes("video") || mediaPreview?.includes(".mp4") || mediaPreview?.includes("mode=inline")
+
   return (
     <NodeShell label="Save to Gallery" icon="💾" status={data.status as string}>
+      <HandleIcon icon={ImageIcon} side="left" title="Input: Media" />
       <Handle
         type="target"
         position={Position.Left}
         id="media"
         style={{ background: getPortColor("media"), width: 10, height: 10, border: "2px solid var(--background)" }}
       />
-      <div className="text-center py-2">
-        <p className="text-muted-foreground text-[11px]">
-          {data.status === "done" ? "✅ Tersimpan di Gallery" : "Simpan hasil ke Gallery"}
-        </p>
+      <div className="py-2">
+        {mediaPreview ? (
+          <div className="rounded-lg overflow-hidden border border-border mb-2">
+            {isVideo ? (
+              <video src={mediaPreview} className="w-full h-auto max-h-32 object-cover" muted />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={mediaPreview} alt="Gallery" className="w-full h-auto max-h-32 object-cover" />
+            )}
+          </div>
+        ) : null}
+        <div className="text-center">
+          {saveStatus === "saving" ? (
+            <p className="text-[11px] text-blue-400 flex items-center justify-center gap-1">
+              <Loader2Icon className="h-3 w-3 animate-spin" /> Menyimpan...
+            </p>
+          ) : saveStatus === "done" ? (
+            <p className="text-[11px] text-emerald-400">✅ Tersimpan di Gallery</p>
+          ) : saveStatus === "error" ? (
+            <p className="text-[11px] text-red-400">❌ Gagal menyimpan</p>
+          ) : (
+            <p className="text-muted-foreground text-[11px]">Simpan hasil ke Gallery</p>
+          )}
+        </div>
+        {saveStatus === "error" && connectedMedia && (
+          <button
+            onClick={() => handleSave(connectedMedia)}
+            className="mt-1.5 w-full flex items-center justify-center gap-1 rounded-lg border border-border py-1 text-[10px] text-muted-foreground hover:text-foreground transition"
+          >
+            <RefreshCwIcon className="h-3 w-3" /> Coba lagi
+          </button>
+        )}
       </div>
     </NodeShell>
   )
@@ -831,9 +914,14 @@ function GalleryNodeComponent({ data }: NodeProps) {
 
 /* ─── Output / Preview Node ─── */
 function OutputNodeComponent({ data }: NodeProps) {
-  const mediaUrl = data.media as string | undefined
+  const connectedMedia = useConnectedValue("media") as string | null
+  const mediaUrl = connectedMedia || (data.media as string | undefined)
+  const isVideo = mediaUrl?.includes("video") || mediaUrl?.includes(".mp4") || mediaUrl?.includes("mode=inline")
+  const [previewOpen, setPreviewOpen] = useState(false)
   return (
-    <NodeShell label="Output" icon="👁️" status={data.status as string}>
+    <>
+    <NodeShell label="Output" icon="👁️" status={mediaUrl ? "done" : (data.status as string)}>
+      <HandleIcon icon={ImageIcon} side="left" title="Input: Media" />
       <Handle
         type="target"
         position={Position.Left}
@@ -842,15 +930,50 @@ function OutputNodeComponent({ data }: NodeProps) {
       />
       <div className="text-center py-2">
         {mediaUrl ? (
-          <div className="rounded-lg overflow-hidden border border-border">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={mediaUrl} alt="Output" className="w-full h-auto max-h-40 object-cover" />
+          <div
+            className="rounded-lg overflow-hidden border border-border cursor-pointer hover:border-blue-400/30 transition"
+            onClick={() => setPreviewOpen(true)}
+          >
+            {isVideo ? (
+              <video src={mediaUrl} className="w-full h-auto max-h-40 object-cover" muted />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={mediaUrl} alt="Output" className="w-full h-auto max-h-40 object-cover" />
+            )}
           </div>
         ) : (
           <p className="text-muted-foreground text-[11px]">Preview hasil akhir</p>
         )}
       </div>
     </NodeShell>
+    {/* Output Preview Popup */}
+    {previewOpen && mediaUrl && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setPreviewOpen(false)}>
+        <div className="relative flex flex-col items-center gap-3 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+          <button onClick={() => setPreviewOpen(false)} className="absolute -top-2 -right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border text-muted-foreground hover:text-foreground transition shadow-lg">
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+          {isVideo ? (
+            <video src={mediaUrl} controls autoPlay className="w-full rounded-xl shadow-2xl max-h-[60vh]" />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={mediaUrl} alt="Preview" className="w-full rounded-xl object-contain shadow-2xl max-h-[60vh]" />
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (isVideo) downloadVideo(mediaUrl, "workflow-output.mp4")
+                else downloadImage(mediaUrl, "workflow-output.png")
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-card border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition active:scale-95"
+            >
+              <DownloadIcon className="h-3.5 w-3.5" /> Download
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
@@ -1207,6 +1330,39 @@ const PALETTE_ITEMS = [
   { type: "ttsNode", label: "TTS", Icon: Volume2Icon },
 ]
 
+/* ─── Agent Chat Input (self-contained with local state) ─── */
+function AgentInputBox({ onSend, disabled }: { onSend: (msg: string) => void; disabled: boolean }) {
+  const [value, setValue] = useState("")
+  const handleSend = () => {
+    const msg = value.trim()
+    if (!msg || disabled) return
+    setValue("")
+    onSend(msg)
+  }
+  return (
+    <div className="flex items-end gap-1.5">
+      <textarea
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend() }
+        }}
+        placeholder="Ketik perintah..."
+        rows={1}
+        disabled={disabled}
+        className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-violet-500/50 resize-none disabled:opacity-50"
+      />
+      <button
+        onClick={handleSend}
+        disabled={disabled || !value.trim()}
+        className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition shrink-0 active:scale-95 disabled:opacity-40"
+      >
+        <SendIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
 /* ═══════════════════════════════════════════════════════
    Main Editor Page
    ═══════════════════════════════════════════════════════ */
@@ -1218,20 +1374,31 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [autoSaved, setAutoSaved] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [activeTool, setActiveTool] = useState<"select" | "grab">("select")
   const [agentOpen, setAgentOpen] = useState(false)
-  const [agentStarted, setAgentStarted] = useState(false)
   const [agentMessages, setAgentMessages] = useState<{ role: "user" | "agent"; text: string }[]>([])
-  const [agentInput, setAgentInput] = useState("")
   const [agentThinking, setAgentThinking] = useState(false)
   const agentEndRef = useRef<HTMLDivElement>(null)
+
+  // Run workflow state
+  const [isRunning, setIsRunning] = useState(false)
+  const [runJobId, setRunJobId] = useState<string | null>(null)
+  const [runErrors, setRunErrors] = useState<string[]>([])
+  const [nodeRunStatus, setNodeRunStatus] = useState<Record<string, string>>({})
+  const runPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ReactFlow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const [rfInstance, setRfInstance] = useState<{ getViewport: () => { x: number; y: number; zoom: number } } | null>(null)
+
+  // Undo/Redo
+  const { pushState, undo, redo, canUndo, canRedo } = useWorkflowHistory(30)
+  const historyLockRef = useRef(false)
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auto-scroll agent chat
   useEffect(() => {
@@ -1321,11 +1488,9 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
       if (!res.ok) throw new Error("Agent error")
       const data = await res.json()
 
-      // Apply actions to canvas
       const actions = data.actions as Record<string, unknown>[] || []
       const applied = actions.length > 0 ? applyAgentActions(actions) : 0
 
-      // Build reply with action summary
       let reply = data.reply || "Siap!"
       if (applied && applied > 0) {
         reply += `\n\n✅ ${applied} perubahan diterapkan ke canvas.`
@@ -1366,7 +1531,43 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
     setLoaded(true)
   }, [id, router, setNodes, setEdges])
 
-  // Connect edges
+  // Auto-save with debounce (3s after any nodes/edges change)
+  useEffect(() => {
+    if (!workflow || !loaded || historyLockRef.current) return
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => {
+      const viewport = rfInstance?.getViewport() || { x: 0, y: 0, zoom: 1 }
+      updateWorkflow(workflow.id, {
+        nodes: nodes.map(n => ({ id: n.id, type: n.type!, position: n.position, data: n.data as Record<string, unknown> })),
+        edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle || "", targetHandle: e.targetHandle || "" })),
+        viewport,
+      })
+      setAutoSaved(true)
+      setTimeout(() => setAutoSaved(false), 2000)
+    }, 3000)
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges])
+
+  // Push to undo history (debounced, 500ms)
+  const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!loaded || historyLockRef.current) return
+    if (historyTimerRef.current) clearTimeout(historyTimerRef.current)
+    historyTimerRef.current = setTimeout(() => {
+      pushState(nodes, edges)
+    }, 500)
+    return () => { if (historyTimerRef.current) clearTimeout(historyTimerRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges])
+
+  // Connect edges — with type label
+  const HANDLE_LABELS: Record<string, string> = useMemo(() => ({
+    prompt: "Prompt", selectedImage: "Image", selectedVideo: "Video",
+    images: "Images", media: "Media", audio: "Audio",
+    poseData: "Pose", cameraParams: "Camera", startImage: "Start",
+  }), [])
+
   const onConnect = useCallback((connection: Connection) => {
     const newEdge: Edge = {
       id: `e_${Date.now()}`,
@@ -1376,138 +1577,168 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
       animated: true,
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
       style: { stroke: getPortColor(connection.sourceHandle || ""), strokeWidth: 2 },
+      label: HANDLE_LABELS[connection.sourceHandle || ""] || "",
+      labelStyle: { fontSize: 10, fontWeight: 500, fill: "var(--muted-foreground)" },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 4,
+      labelBgStyle: { fill: "var(--card)", stroke: "var(--border)", strokeWidth: 1 },
     }
     setEdges(eds => addEdge(newEdge, eds))
-  }, [setEdges])
+  }, [setEdges, HANDLE_LABELS])
 
-  // Save
+  // Manual Save
   const handleSave = useCallback(() => {
     if (!workflow) return
     setSaving(true)
     const viewport = rfInstance?.getViewport() || { x: 0, y: 0, zoom: 1 }
-
     updateWorkflow(workflow.id, {
-      nodes: nodes.map(n => ({
-        id: n.id,
-        type: n.type!,
-        position: n.position,
-        data: n.data as Record<string, unknown>,
-      })),
-      edges: edges.map(e => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle || "",
-        targetHandle: e.targetHandle || "",
-      })),
+      nodes: nodes.map(n => ({ id: n.id, type: n.type!, position: n.position, data: n.data as Record<string, unknown> })),
+      edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle || "", targetHandle: e.targetHandle || "" })),
       viewport,
     })
-
-    setTimeout(() => {
-      setSaving(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    }, 300)
+    setTimeout(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000) }, 300)
   }, [workflow, nodes, edges, rfInstance])
 
-  // Clear canvas
-  const handleClear = () => {
-    setNodes([])
-    setEdges([])
-  }
+  // Undo/Redo Handlers
+  const handleUndo = useCallback(() => {
+    const snapshot = undo()
+    if (!snapshot) return
+    historyLockRef.current = true
+    setNodes(snapshot.nodes)
+    setEdges(snapshot.edges)
+    setTimeout(() => { historyLockRef.current = false }, 100)
+  }, [undo, setNodes, setEdges])
 
-  // Drag & drop from palette
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-  }, [])
+  const handleRedo = useCallback(() => {
+    const snapshot = redo()
+    if (!snapshot) return
+    historyLockRef.current = true
+    setNodes(snapshot.nodes)
+    setEdges(snapshot.edges)
+    setTimeout(() => { historyLockRef.current = false }, 100)
+  }, [redo, setNodes, setEdges])
+
+  // Run Workflow (server-side)
+  const handleRunWorkflow = useCallback(async () => {
+    if (nodes.length === 0) return
+    const validation = validateWorkflow(nodes, edges)
+    if (!validation.valid) {
+      alert(`❌ Workflow tidak valid:\n${validation.errors.join("\n")}`)
+      return
+    }
+    if (validation.warnings.length > 0) {
+      const proceed = window.confirm(`⚠️ Peringatan:\n${validation.warnings.join("\n")}\n\nLanjutkan?`)
+      if (!proceed) return
+    }
+    setIsRunning(true)
+    setRunErrors([])
+    setNodeRunStatus({})
+
+    try {
+      const res = await fetch("/api/ai/workflow-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nodes: nodes.map(n => ({ id: n.id, type: n.type, data: n.data })),
+          edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setRunErrors([data.error || "Gagal memulai workflow"])
+        setIsRunning(false)
+        return
+      }
+      const jobId = data.jobId
+      setRunJobId(jobId)
+
+      if (runPollRef.current) clearInterval(runPollRef.current)
+      runPollRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`/api/ai/workflow-run?jobId=${encodeURIComponent(jobId)}`)
+          const pollData = await pollRes.json()
+
+          const progress = pollData.nodeProgress as Record<string, { status: string; output?: Record<string, unknown> }> || {}
+          const newStatus: Record<string, string> = {}
+          for (const [nId, p] of Object.entries(progress)) {
+            newStatus[nId] = p.status
+            if (p.status === "done" && p.output) {
+              setNodes(nds => nds.map(n => n.id === nId ? { ...n, data: { ...n.data, ...p.output } } : n))
+            }
+          }
+          setNodeRunStatus(newStatus)
+
+          if (pollData.status === "done" || pollData.status === "error" || pollData.status === "cancelled") {
+            if (runPollRef.current) clearInterval(runPollRef.current)
+            setIsRunning(false)
+            setRunJobId(null)
+            if (pollData.errors?.length) setRunErrors(pollData.errors)
+          }
+        } catch { }
+      }, 2000)
+    } catch {
+      setRunErrors(["Gagal menghubungi server"])
+      setIsRunning(false)
+    }
+  }, [nodes, edges, setNodes])
+
+  // Stop running workflow
+  const handleStopRun = useCallback(async () => {
+    if (runJobId) {
+      await fetch(`/api/ai/workflow-run?jobId=${encodeURIComponent(runJobId)}`, { method: "DELETE" })
+    }
+    if (runPollRef.current) clearInterval(runPollRef.current)
+    setIsRunning(false)
+    setRunJobId(null)
+  }, [runJobId])
+
+  useEffect(() => () => { if (runPollRef.current) clearInterval(runPollRef.current) }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isCmd = e.metaKey || e.ctrlKey
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+      const isInput = tag === "input" || tag === "textarea" || tag === "select"
+      if (isInput) return
+
+      if (isCmd && e.key === "s") { e.preventDefault(); handleSave() }
+      if (isCmd && e.key === "z" && !e.shiftKey) { e.preventDefault(); handleUndo() }
+      if (isCmd && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); handleRedo() }
+      if (!isCmd && e.key === "v") setActiveTool("select")
+      if (!isCmd && e.key === "h") setActiveTool("grab")
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [handleSave, handleUndo, handleRedo])
+
+  const handleClear = () => { setNodes([]); setEdges([]) }
+  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }, [])
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     const type = e.dataTransfer.getData("application/reactflow")
     if (!type) return
-
     const bounds = reactFlowWrapper.current?.getBoundingClientRect()
     if (!bounds) return
-
-    const position = {
-      x: e.clientX - bounds.left - 120,
-      y: e.clientY - bounds.top - 30,
-    }
-
-    const defaultData: Record<string, Record<string, unknown>> = {
-      promptNode: { prompt: "" },
-      imageGenNode: { model: "nano-banana-2", aspectRatio: "9:16", count: 1 },
-      videoGenNode: { model: "veo-3.1-lite-low-priority", aspectRatio: "16:9", duration: "5s" },
-      galleryNode: {},
-      outputNode: {},
-      extendVideoNode: {},
-      uploadNode: {},
-      imageGridNode: {},
-      extractFrameNode: {},
-      poseNode: {},
-      cameraControlNode: {},
-      voiceNode: {},
-      ttsNode: {},
-    }
-
-    const newNode: Node = {
-      id: `n_${Date.now()}`,
-      type,
-      position,
-      data: defaultData[type] || {},
-    }
-
+    const position = { x: e.clientX - bounds.left - 120, y: e.clientY - bounds.top - 30 }
+    const newNode: Node = { id: `n_${Date.now()}`, type, position, data: {} }
     setNodes(nds => [...nds, newNode])
   }, [setNodes])
 
-  // Click-to-add: place node at center of visible canvas
   const addNodeAtCenter = useCallback((type: string) => {
     const wrapper = reactFlowWrapper.current
     if (!wrapper) return
-
     const bounds = wrapper.getBoundingClientRect()
     const viewport = rfInstance?.getViewport() || { x: 0, y: 0, zoom: 1 }
-
-    // Convert screen center to flow coordinates
     const centerX = (bounds.width / 2 - viewport.x) / viewport.zoom
     const centerY = (bounds.height / 2 - viewport.y) / viewport.zoom
-
-    // Slight random offset to prevent stacking
     const offset = Math.random() * 60 - 30
-
-    const defaultData: Record<string, Record<string, unknown>> = {
-      promptNode: { prompt: "" },
-      imageGenNode: { model: "nano-banana-2", aspectRatio: "9:16", count: 1 },
-      videoGenNode: { model: "veo-3.1-lite-low-priority", aspectRatio: "16:9", duration: "5s" },
-      galleryNode: {},
-      outputNode: {},
-      extendVideoNode: {},
-      uploadNode: {},
-      imageGridNode: {},
-      extractFrameNode: {},
-      poseNode: {},
-      cameraControlNode: {},
-      voiceNode: {},
-      ttsNode: {},
-    }
-
-    const newNode: Node = {
-      id: `n_${Date.now()}`,
-      type,
-      position: { x: centerX - 140 + offset, y: centerY - 80 + offset },
-      data: defaultData[type] || {},
-    }
-
+    const newNode: Node = { id: `n_${Date.now()}`, type, position: { x: centerX - 140 + offset, y: centerY - 80 + offset }, data: {} }
     setNodes(nds => [...nds, newNode])
   }, [setNodes, rfInstance])
 
-  // Credit estimation
-  const estimatedCredits = nodes.reduce((sum, n) => {
-    if (n.type === "imageGenNode") return sum + 5 * ((n.data as Record<string, unknown>).count as number || 1)
-    if (n.type === "videoGenNode") return sum + 20
-    return sum
-  }, 0)
+  const estimatedCredits = estimateWorkflowCredits(nodes)
 
   if (!loaded) {
     return (
@@ -1518,11 +1749,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div className={cn(
-      "flex flex-col bg-background transition-all duration-300",
-      isFullscreen ? "fixed inset-0 z-50" : "h-[calc(100vh-0px)]"
-    )}>
-      {/* Header — hidden in fullscreen */}
+    <div className={cn("flex flex-col bg-background transition-all duration-300", isFullscreen ? "fixed inset-0 z-50" : "h-[calc(100vh-0px)]")}>
       {!isFullscreen && (
         <DashboardHeader breadcrumbs={[
           { label: "Jenna Bot Pro", href: "/dashboard" },
@@ -1531,7 +1758,6 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
         ]} />
       )}
 
-      {/* ─── Main: Canvas + Toolbar + Bottom Palette ─── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-card/30 shrink-0">
@@ -1543,21 +1769,54 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
             >
               <ArrowLeftIcon className="h-4 w-4" />
             </button>
-            <span className="text-sm font-medium text-foreground truncate max-w-[200px]">{workflow?.name}</span>
+            {/* Undo / Redo */}
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo || isRunning}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-30"
+              title="Undo (⌘Z)"
+            >
+              <Undo2Icon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo || isRunning}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-30"
+              title="Redo (⌘⇧Z)"
+            >
+              <Redo2Icon className="h-3.5 w-3.5" />
+            </button>
+            <div className="h-5 w-px bg-border/40" />
+            <span className="text-sm font-medium text-foreground truncate max-w-[160px]">{workflow?.name}</span>
             {estimatedCredits > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 text-[10px] font-medium text-violet-400">
                 <CoinsIcon className="h-3 w-3" />
-                {estimatedCredits}
+                ~{estimatedCredits}
+              </span>
+            )}
+            {autoSaved && (
+              <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
+                <CheckCircle2Icon className="h-3 w-3" /> Auto-saved
               </span>
             )}
           </div>
           <div className="flex items-center gap-1">
+            {/* Run / Stop button */}
             <button
-              onClick={() => { /* TODO: run workflow */ }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition"
-              title="Run Workflow"
+              onClick={isRunning ? handleStopRun : handleRunWorkflow}
+              disabled={nodes.length === 0}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition active:scale-95 disabled:opacity-40",
+                isRunning
+                  ? "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/20"
+                  : "bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/20"
+              )}
+              title={isRunning ? "Stop" : "Run Workflow"}
             >
-              <PlayIcon className="h-4 w-4" />
+              {isRunning
+                ? <><Loader2Icon className="h-3.5 w-3.5 animate-spin" /> Stop</>
+                : <><PlayIcon className="h-3.5 w-3.5" /> Run</>
+              }
             </button>
             <button
               onClick={handleSave}
@@ -1566,13 +1825,14 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
                 "flex h-8 w-8 items-center justify-center rounded-lg transition",
                 saved ? "text-emerald-400" : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
-              title={saved ? "Tersimpan" : "Simpan"}
+              title={saved ? "Tersimpan" : "Simpan (⌘S)"}
             >
               {saving ? <Loader2Icon className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2Icon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
             </button>
             <button
               onClick={handleClear}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition"
+              disabled={isRunning}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition disabled:opacity-40"
               title="Bersihkan canvas"
             >
               <Trash2Icon className="h-4 w-4" />
@@ -1632,6 +1892,62 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
                   <div className="mt-32 text-center animate-fade-up">
                     <p className="text-sm text-muted-foreground/50 mb-1">Klik icon di toolbar bawah untuk menambah node</p>
                     <p className="text-xs text-muted-foreground/30">Atau drag icon ke canvas • Hubungkan port antar node</p>
+                  </div>
+                </Panel>
+              )}
+
+              {/* Run progress panel */}
+              {isRunning && (
+                <Panel position="top-right">
+                  <div className="w-60 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-xl p-3 space-y-2 mt-2 mr-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Loader2Icon className="h-3.5 w-3.5 text-violet-400 animate-spin" />
+                        Running Workflow
+                      </span>
+                      <button
+                        onClick={handleStopRun}
+                        className="text-[10px] text-red-400 hover:text-red-300 transition"
+                      >
+                        Stop
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {nodes.map(n => {
+                        const st = nodeRunStatus[n.id] || (n.data as Record<string, unknown>).status as string
+                        return (
+                          <div key={n.id} className="flex items-center gap-2 text-[10px]">
+                            {st === "running" && <Loader2Icon className="h-3 w-3 text-blue-400 animate-spin shrink-0" />}
+                            {st === "done" && <CheckCircle2Icon className="h-3 w-3 text-emerald-400 shrink-0" />}
+                            {st === "error" && <AlertCircleIcon className="h-3 w-3 text-red-400 shrink-0" />}
+                            {st === "skipped" && <XCircleIcon className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
+                            {!st && <div className="h-3 w-3 rounded-full border border-border shrink-0" />}
+                            <span className={cn("truncate", st === "running" ? "text-foreground" : "text-muted-foreground")}>
+                              {n.type?.replace("Node", "").replace(/([A-Z])/g, " $1").trim()}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </Panel>
+              )}
+
+              {/* Run errors panel */}
+              {!isRunning && runErrors.length > 0 && (
+                <Panel position="top-right">
+                  <div className="w-60 rounded-xl border border-red-500/30 bg-card/95 backdrop-blur-xl shadow-xl p-3 space-y-2 mt-2 mr-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-red-400 flex items-center gap-1.5">
+                        <AlertCircleIcon className="h-3.5 w-3.5" /> Errors
+                      </span>
+                      <button onClick={() => setRunErrors([])} className="text-[10px] text-muted-foreground hover:text-foreground transition">Tutup</button>
+                    </div>
+                    <div className="space-y-1">
+                      {runErrors.map((err, i) => (
+                        <p key={i} className="text-[10px] text-red-400/80 leading-tight">{err}</p>
+                      ))}
+                    </div>
                   </div>
                 </Panel>
               )}
@@ -1719,7 +2035,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              {!agentStarted ? (
+              {agentMessages.length === 0 ? (
                 /* Welcome State */
                 <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
                   <div className="space-y-4 max-w-[250px]">
@@ -1747,13 +2063,13 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
 
                     <div className="space-y-2 pt-2">
                       <button
-                        onClick={() => { setAgentStarted(true); setAgentMessages([{ role: "agent", text: `Halo! Saya Workflow Agent. Saya bisa bantu:\n\n\u2022 \ud83d\udcd6 Baca canvas kamu & analisis alur\n\u2022 \ud83d\udd27 Siapkan template workflow\n\u2022 \u26a1 Bantu konfigurasi node\n\nMau mulai dari mana?` }]) }}
+                        onClick={() => { setAgentMessages([{ role: "agent", text: `Halo! Saya Workflow Agent. Saya bisa bantu:\n\n\u2022 \ud83d\udcd6 Baca canvas kamu & analisis alur\n\u2022 \ud83d\udd27 Siapkan template workflow\n\u2022 \u26a1 Bantu konfigurasi node\n\nMau mulai dari mana?` }]) }}
                         className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:shadow-md hover:shadow-violet-500/20 transition-all active:scale-[0.98]"
                       >
                         Mulai Agent
                       </button>
                       <button
-                        onClick={() => { setAgentStarted(true) }}
+                        onClick={() => { setAgentMessages([]) }}
                         className="w-full rounded-xl bg-muted px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition"
                       >
                         Langsung ke chat
@@ -1809,35 +2125,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
 
                   {/* Input */}
                   <div className="px-3 py-2 border-t border-border">
-                    <div className="flex items-end gap-1.5">
-                      <textarea
-                        value={agentInput}
-                        onChange={e => setAgentInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault()
-                            if (!agentInput.trim() || agentThinking) return
-                            const msg = agentInput.trim()
-                            setAgentInput("")
-                            sendAgentMessage(msg)
-                          }
-                        }}
-                        placeholder="Ketik perintah..."
-                        rows={1}
-                        className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-violet-500/50 resize-none"
-                      />
-                      <button
-                        onClick={() => {
-                          if (!agentInput.trim() || agentThinking) return
-                          const msg = agentInput.trim()
-                          setAgentInput("")
-                          sendAgentMessage(msg)
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition shrink-0 active:scale-95"
-                      >
-                        <SendIcon className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <AgentInputBox onSend={sendAgentMessage} disabled={agentThinking} />
                   </div>
                 </>
               )}

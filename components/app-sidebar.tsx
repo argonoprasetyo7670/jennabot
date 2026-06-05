@@ -45,6 +45,7 @@ import {
   KeyRoundIcon,
   FileTextIcon,
   ShieldIcon,
+  LineChartIcon,
 
 } from "lucide-react"
 
@@ -57,18 +58,25 @@ const navItems: NavItem[] = [
     icon: <LayoutDashboardIcon className="h-4 w-4" />,
     type: "link",
   },
+
+  {
+    title: "Workflow",
+    url: "/dashboard/workflow",
+    icon: <LayoutPanelLeftIcon className="h-4 w-4" />,
+    type: "link",
+  },
   // {
   //   title: "Tutorial",
   //   url: "/tutorial",
   //   icon: <BookOpenIcon className="h-4 w-4" />,
   //   type: "link",
   // },
-  {
-    title: "WA Group Chat",
-    url: "https://chat.whatsapp.com/",
-    icon: <MessageCircleIcon className="h-4 w-4" />,
-    type: "external",
-  },
+  // {
+  //   title: "WA Group Chat",
+  //   url: "https://chat.whatsapp.com/",
+  //   icon: <MessageCircleIcon className="h-4 w-4" />,
+  //   type: "external",
+  // },
 
   // ── Image Tools (collapsible) ──
   {
