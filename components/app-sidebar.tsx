@@ -28,6 +28,7 @@ import {
   PenToolIcon,
   VideoIcon,
   FilmIcon,
+  MicIcon,
   StarIcon,
   LayoutPanelLeftIcon,
   LayersIcon,
@@ -103,6 +104,18 @@ const navItems: NavItem[] = [
       // { title: "Merge Videos", url: "/dashboard/concatenate-video" },
       // { title: "Kling v3 Omni", url: "/dashboard/kling-v3-omni" },
       // { title: "Seedance Pro", url: "/dashboard/seedance-pro" },
+    ],
+  },
+
+  // ── Audio Tools (collapsible) ──
+  {
+    title: "Audio Tools",
+    url: "#",
+    icon: <MicIcon className="h-4 w-4" />,
+    type: "collapsible",
+    items: [
+      { title: "Text to Speech", url: "/dashboard/audio-tools/text-to-speech" },
+      { title: "Sound Effects", url: "/dashboard/audio-tools/sound-effects" },
     ],
   },
 

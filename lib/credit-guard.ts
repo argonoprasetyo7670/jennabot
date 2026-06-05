@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma"
 
 /* ─── Credit Cost Constants ─── */
-export const CREDIT_COST_IMAGE = 5      // per image
-export const CREDIT_COST_VIDEO = 20     // per video
+export const CREDIT_COST_IMAGE = 1      // per image
+export const CREDIT_COST_VIDEO = 10     // per video
 export const CREDIT_COST_UPSCALE = 10   // per upscale
 export const CREDIT_COST_CHAT = 1       // per workflow-agent request
 export const CREDIT_COST_MOTION = 120   // per motion-control task
+export const CREDIT_COST_TTS = 3        // per text-to-speech generation
+export const CREDIT_COST_SFX = 5        // per sound effect generation
 
 /**
  * Check if a user has enough credits for an operation.

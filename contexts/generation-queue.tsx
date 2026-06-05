@@ -13,8 +13,8 @@ import {
 } from "@/lib/api/google-flow"
 
 /* ─── Credit Costs ─── */
-export const CREDIT_COST_IMAGE = 5  // per image
-export const CREDIT_COST_VIDEO = 20 // per video (Google Flow)
+export const CREDIT_COST_IMAGE = 1  // per image
+export const CREDIT_COST_VIDEO = 10 // per video (Google Flow)
 export const CREDIT_COST_RUNWAY = 120 // per Runway video (Seedance 2.0, Motion Control)
 
 

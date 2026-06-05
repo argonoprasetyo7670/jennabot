@@ -47,7 +47,7 @@ export const vipBullets = [
 export const faqItems = [
   { q: "Apa saja fitur yang tersedia?", a: "Jenna Bot Pro menyediakan AI Image Generator, Product Studio, Model Studio, Thumbnail Generator, AI Video Generator, dan Review Product. Semua bisa diakses dari satu dashboard." },
   { q: "Metode pembayaran apa yang tersedia?", a: "Kami mendukung transfer bank, e-wallet (GoPay, OVO, Dana), dan kartu kredit/debit melalui payment gateway Midtrans." },
-  { q: "Berapa biaya per generasi?", a: "Image generation menggunakan 5 poin per gambar. Video generation menggunakan 20 poin per video. Beli paket kredit untuk harga lebih murah." },
+  { q: "Berapa biaya per generasi?", a: "Image generation menggunakan 1 poin per gambar. Video generation menggunakan 10 poin per video. Beli paket kredit untuk harga lebih murah." },
   { q: "Apakah konten AI bisa digunakan secara komersial?", a: "Ya! Semua konten yang dihasilkan bisa digunakan untuk keperluan bisnis dan marketing. Anda memiliki hak komersial penuh." },
   { q: "Bagaimana sistem kredit bekerja?", a: "Kredit adalah mata uang terpadu untuk semua tools. Beli paket kredit, gunakan untuk generate gambar atau video. Saldo bisa dipantau di dashboard." },
   { q: "Apakah ada trial gratis?", a: "Akun baru mendapatkan kredit starter gratis untuk mencoba semua fitur. Top up kapan saja saat kredit habis." },

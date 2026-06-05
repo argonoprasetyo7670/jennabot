@@ -188,8 +188,8 @@ export default function Home() {
           {/* CREDIT COSTS */}
           <div className="mx-auto mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
             {[
-              { label: "Biaya gambar", value: "5 poin" },
-              { label: "Biaya video", value: "20 poin" },
+              { label: "Biaya gambar", value: "1 poin" },
+              { label: "Biaya video", value: "10 poin" },
               { label: "Kredit starter", value: "Gratis" },
               { label: "Download", value: "Tanpa batas" },
             ].map((c) => (

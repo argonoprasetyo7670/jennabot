@@ -12,7 +12,7 @@ export interface FeatureItem {
   /** Dashboard URL path */
   url: string
   /** Category grouping */
-  category: "image" | "video" | "other"
+  category: "image" | "video" | "audio" | "other"
   /** Emoji icon for landing page */
   emoji: string
   /** Gradient classes for dashboard cards */
@@ -37,7 +37,7 @@ export const FEATURES: FeatureItem[] = [
     emoji: "✨",
     gradient: "from-violet-500 to-purple-600",
     tags: ["Text to Image", "Image to Image", "Multi-model", "Hi-Res"],
-    creditBadge: "5 poin/gambar",
+    creditBadge: "1 poin/gambar",
     showOnLanding: true,
     showOnDashboard: true,
   },
@@ -49,7 +49,7 @@ export const FEATURES: FeatureItem[] = [
     emoji: "🛍️",
     gradient: "from-pink-500 to-rose-600",
     tags: ["Product Photo", "Background AI", "E-commerce"],
-    creditBadge: "5 poin/gambar",
+    creditBadge: "1 poin/gambar",
     showOnLanding: true,
     showOnDashboard: true,
   },
@@ -61,7 +61,7 @@ export const FEATURES: FeatureItem[] = [
     emoji: "👤",
     gradient: "from-fuchsia-500 to-pink-600",
     tags: ["AI Model", "Pose Control", "Fashion"],
-    creditBadge: "5 poin/gambar",
+    creditBadge: "1 poin/gambar",
     showOnLanding: true,
     showOnDashboard: true,
   },
@@ -73,7 +73,7 @@ export const FEATURES: FeatureItem[] = [
     emoji: "🎨",
     gradient: "from-amber-500 to-orange-600",
     tags: ["YouTube", "Social Media", "Text Overlay"],
-    creditBadge: "5 poin/gambar",
+    creditBadge: "1 poin/gambar",
     showOnLanding: true,
     showOnDashboard: true,
   },
@@ -87,7 +87,7 @@ export const FEATURES: FeatureItem[] = [
     emoji: "🎬",
     gradient: "from-blue-500 to-cyan-600",
     tags: ["Text to Video", "Image to Video", "Veo 3.1"],
-    creditBadge: "20 poin/video",
+    creditBadge: "10 poin/video",
     showOnLanding: true,
     showOnDashboard: true,
   },
@@ -99,7 +99,33 @@ export const FEATURES: FeatureItem[] = [
     emoji: "📹",
     gradient: "from-indigo-500 to-blue-600",
     tags: ["Product Review", "Auto Video", "2-Step Pipeline"],
-    creditBadge: "25 poin/review",
+    creditBadge: "11 poin/review",
+    showOnLanding: true,
+    showOnDashboard: true,
+  },
+
+  // ── Audio Tools ──
+  {
+    title: "Text to Speech",
+    description: "Ubah teks menjadi suara natural dengan berbagai voice dan model AI dari ElevenLabs.",
+    url: "/dashboard/audio-tools/text-to-speech",
+    category: "audio",
+    emoji: "🎤",
+    gradient: "from-emerald-500 to-teal-600",
+    tags: ["TTS", "AI Voice", "Multi-language"],
+    creditBadge: "3 poin/audio",
+    showOnLanding: true,
+    showOnDashboard: true,
+  },
+  {
+    title: "Sound Effects",
+    description: "Generate sound effects custom dari deskripsi teks. Cocok untuk video dan podcast.",
+    url: "/dashboard/audio-tools/sound-effects",
+    category: "audio",
+    emoji: "🔊",
+    gradient: "from-cyan-500 to-blue-600",
+    tags: ["Sound FX", "AI Audio", "Custom"],
+    creditBadge: "5 poin/audio",
     showOnLanding: true,
     showOnDashboard: true,
   },
@@ -140,3 +166,6 @@ export const IMAGE_TOOLS = FEATURES.filter((f) => f.category === "image")
 
 /** Video tools only */
 export const VIDEO_TOOLS = FEATURES.filter((f) => f.category === "video")
+
+/** Audio tools only */
+export const AUDIO_TOOLS = FEATURES.filter((f) => f.category === "audio")
