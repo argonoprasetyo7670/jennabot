@@ -614,7 +614,7 @@ function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
       const durMap: Record<string, number> = { "5s": 4, "8s": 8 }
       const result = await generateVideos({
         prompt: activePrompt.trim(),
-        model: ((nd.model as string) || "veo-3.1-fast") as "veo-3.1-fast",
+        model: ((nd.model as string) || "veo-3.1-lite-low-priority") as "veo-3.1-lite-low-priority",
         aspectRatio: arMap[(nd.aspectRatio as string) || "16:9"] || "landscape",
         duration: (durMap[(nd.duration as string) || "8s"] || 8) as 8,
         startImage: connectedImage || undefined,
@@ -649,7 +649,7 @@ function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
     setSavingGallery(true)
     try {
       await fetch("/api/gallery/save", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: rawVideoUrl, prompt: activePrompt, model: (nd.model as string) || "veo-3.1-fast", type: "video" }) })
+        body: JSON.stringify({ url: rawVideoUrl, prompt: activePrompt, model: (nd.model as string) || "veo-3.1-lite-low-priority", type: "video" }) })
     } catch { /* silent */ }
     setSavingGallery(false)
   }
@@ -881,7 +881,7 @@ function ExtendVideoNodeComponent({ data, id: nodeId }: NodeProps) {
       const { uploadImageAsset: upload } = await import("@/lib/api/google-flow")
       const asset = await upload(file)
       const prompt = (nd._extendPrompt as string) || "Continue the video naturally with smooth motion"
-      const result = await generateVideos({ prompt, model: "veo-3.1-fast", aspectRatio: "landscape", duration: ((nd.extendDuration as string) === "5s" ? 4 : 8) as 4 | 8, startImage: asset.mediaGenerationId, email: asset.email })
+      const result = await generateVideos({ prompt, model: "veo-3.1-lite-low-priority", aspectRatio: "landscape", duration: ((nd.extendDuration as string) === "5s" ? 4 : 8) as 4 | 8, startImage: asset.mediaGenerationId, email: asset.email })
       const videoUrl = result.videos[0]?.url || ""
       updateNodeData(nodeId, { status: "done", selectedVideo: videoUrl, _resultUrl: videoUrl })
     } catch (err) { setError(err instanceof Error ? err.message : "Gagal extend video"); updateNodeData(nodeId, { status: "error" })
@@ -1438,7 +1438,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
     const defaultData: Record<string, Record<string, unknown>> = {
       promptNode: { prompt: "" },
       imageGenNode: { model: "nano-banana-2", aspectRatio: "9:16", count: 1 },
-      videoGenNode: { model: "veo-3.1-fast", aspectRatio: "16:9", duration: "5s" },
+      videoGenNode: { model: "veo-3.1-lite-low-priority", aspectRatio: "16:9", duration: "5s" },
       galleryNode: {},
       outputNode: {},
       extendVideoNode: {},
@@ -1479,7 +1479,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
     const defaultData: Record<string, Record<string, unknown>> = {
       promptNode: { prompt: "" },
       imageGenNode: { model: "nano-banana-2", aspectRatio: "9:16", count: 1 },
-      videoGenNode: { model: "veo-3.1-fast", aspectRatio: "16:9", duration: "5s" },
+      videoGenNode: { model: "veo-3.1-lite-low-priority", aspectRatio: "16:9", duration: "5s" },
       galleryNode: {},
       outputNode: {},
       extendVideoNode: {},

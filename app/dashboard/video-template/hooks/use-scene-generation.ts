@@ -229,7 +229,7 @@ export function useSceneGeneration({
 
           const vidResult = await generateVideos({
             prompt: videoPrompt,
-            model: "veo-3.1-fast",
+            model: "veo-3.1-lite-low-priority",
             aspectRatio: "portrait",
             duration: 8,
             count: 1,
@@ -378,7 +378,7 @@ export function useSceneGeneration({
 
       const vidResult = await generateVideos({
         prompt: videoPrompt,
-        model: "veo-3.1-fast",
+        model: "veo-3.1-lite-low-priority",
         aspectRatio: "portrait",
         duration: 8,
         count: 1,
@@ -429,7 +429,7 @@ export function useSceneGeneration({
       id: jobId,
       type: "video",
       prompt: `Video Only: ${selectedTemplate.template.name} — Scene ${sceneIndex + 1}`,
-      model: "veo-3.1-fast",
+      model: "veo-3.1-lite-low-priority",
       status: "generating",
       progress: `Scene ${sceneIndex + 1}: Membuat video...`,
       images: [], videos: [],
@@ -448,7 +448,7 @@ export function useSceneGeneration({
 
       const vidResult = await generateVideos({
         prompt: videoPrompt,
-        model: "veo-3.1-fast",
+        model: "veo-3.1-lite-low-priority",
         aspectRatio: "portrait",
         duration: 8,
         count: 1,

@@ -256,7 +256,7 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
 
   const body: Record<string, unknown> = {
     prompt: params.prompt.trim(),
-    model: params.model || "veo-3.1-fast",
+    model: params.model || "veo-3.1-lite-low-priority",
     aspectRatio: params.aspectRatio || "landscape",
     duration: params.duration || 8,
     count: params.count || 1,

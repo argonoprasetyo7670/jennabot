@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma"
 
 /* ─── Credit Cost Constants ─── */
 export const CREDIT_COST_IMAGE = 1      // per image
-export const CREDIT_COST_VIDEO = 10     // per video
+export const CREDIT_COST_VIDEO = 5      // per video
 export const CREDIT_COST_UPSCALE = 10   // per upscale
 export const CREDIT_COST_CHAT = 1       // per workflow-agent request
 export const CREDIT_COST_MOTION = 120   // per motion-control task

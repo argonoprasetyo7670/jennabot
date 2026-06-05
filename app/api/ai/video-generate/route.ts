@@ -8,7 +8,7 @@ const CAPTCHA_BROKER_KEY = process.env.CAPTCHA_BROKER_KEY || "sk-admin-change-me
 const MAX_CAPTCHA_RETRIES = 3
 
 /** Credit cost per video — MUST match CREDIT_COST_VIDEO in generation-queue.tsx */
-const CREDIT_COST_VIDEO = 10
+const CREDIT_COST_VIDEO = 5
 
 /**
  * Track which jobs have already been credit-deducted (prevents double deduction on re-poll).
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
     // Build payload
     const basePayload: Record<string, unknown> = {
       prompt,
-      model: model || "veo-3.1-fast",
+      model: model || "veo-3.1-lite-low-priority",
       aspectRatio: aspectRatio || "landscape",
       duration: duration || 8,
       count: videoCount,

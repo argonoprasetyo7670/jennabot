@@ -14,7 +14,7 @@ import {
 
 /* ─── Credit Costs ─── */
 export const CREDIT_COST_IMAGE = 1  // per image
-export const CREDIT_COST_VIDEO = 10 // per video (Google Flow)
+export const CREDIT_COST_VIDEO = 5 // per video (Google Flow)
 export const CREDIT_COST_RUNWAY = 120 // per Runway video (Seedance 2.0, Motion Control)
 
 
@@ -243,7 +243,7 @@ function submitVideoJobToStore(
     id,
     type: "video",
     prompt: params.prompt || "",
-    model: params.model || "veo-3.1-fast",
+    model: params.model || "veo-3.1-lite-low-priority",
     status: hasUploads ? "uploading" : "generating",
     progress: hasUploads ? "Mengupload referensi..." : "Membuat video...",
     images: [],

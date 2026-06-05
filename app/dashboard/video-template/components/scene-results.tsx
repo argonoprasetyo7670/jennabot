@@ -53,7 +53,7 @@ export function SceneResults({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url, type, prompt,
-          model: type === "image" ? "nano-banana-2" : "veo-3.1-fast",
+          model: type === "image" ? "nano-banana-2" : "veo-3.1-lite-low-priority",
           aspectRatio: "9:16",
           sourceAction: "video-template",
         }),
