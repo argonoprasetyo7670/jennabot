@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
     const taskId = (data.task as Record<string, unknown> | undefined)?.taskId || data.taskId
     if (!taskId) {
       console.error("[runway/video-generate] No taskId in response:", data)
-      return NextResponse.json({ error: "Gagal memulai pembuatan video. Silakan coba lagi." }, { status: 500 })
+      return NextResponse.json({ error: `Gagal memulai (No taskId). Response: ${JSON.stringify(data)}` }, { status: 500 })
     }
 
     console.log(`[runway/video-generate] Task started: ${taskId}`)
@@ -254,9 +254,9 @@ export async function POST(req: NextRequest) {
       taskId,
       status: "processing",
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("[runway/video-generate] Error:", error)
-    return NextResponse.json({ error: "Gagal memulai pembuatan video. Silakan coba lagi." }, { status: 500 })
+    return NextResponse.json({ error: `Gagal memulai: ${error?.message || error}` }, { status: 500 })
   }
 }
 
