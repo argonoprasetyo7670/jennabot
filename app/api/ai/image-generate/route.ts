@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { CREDIT_COST_IMAGE, deductCredits, refundCredits } from "@/lib/credit-guard"
@@ -35,14 +38,24 @@ async function getCaptchaToken(): Promise<string | null> {
  * Extract image URLs from UseAPI response.
  */
 function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] {
-  if (Array.isArray(data.images)) {
-    return data.images
+  const processMediaArray = (arr: any[]) => {
+    return arr.map((m) => {
+      const gen = m.image?.generatedImage
+      const rawMgId = gen?.mediaGenerationId
+      const resolvedMgId = rawMgId && typeof rawMgId === "object" ? rawMgId.mediaGenerationId : rawMgId
+      return {
+        url: gen?.fifeUrl || gen?.uri,
+        mediaGenerationId: resolvedMgId,
+      }
+    }).filter((m) => m.url)
   }
+
+  if (Array.isArray(data.media)) return processMediaArray(data.media)
+  if (Array.isArray(data.images)) return data.images as Record<string, unknown>[]
   
   const response = data.response as Record<string, unknown> | undefined
-  if (response && Array.isArray(response.images)) {
-    return response.images
-  }
+  if (response && Array.isArray(response.media)) return processMediaArray(response.media)
+  if (response && Array.isArray(response.images)) return response.images as Record<string, unknown>[]
 
   // Handle async operations format
   if (response && Array.isArray(response.operations)) {
@@ -54,9 +67,11 @@ function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] 
       .map((op) => {
         const image = op.image as Record<string, unknown> | undefined
         const imageUrl = (image?.uri || image?.fifeUrl) as string | undefined
+        const rawMgId = op.mediaGenerationId
+        const resolvedMgId = rawMgId && typeof rawMgId === "object" ? (rawMgId as any).mediaGenerationId : rawMgId
         return {
           url: imageUrl,
-          mediaGenerationId: op.mediaGenerationId as string | undefined,
+          mediaGenerationId: resolvedMgId as string | undefined,
         }
       })
       .filter((m) => m.url)
@@ -114,8 +129,15 @@ export async function POST(req: NextRequest) {
     if (useAsync) {
       const appUrl = process.env.NEXTAUTH_URL || ""
       const isProduction = !appUrl.includes("localhost") && !appUrl.includes("127.0.0.1")
-      if (isProduction) {
-        const secret = (process.env.NEXTAUTH_SECRET || "").slice(0, 16)
+      // ALWAYS SET replyUrl FOR DEBUGGING PURPOSES (Even on localhost, though it won't be reachable)
+      // Wait, UseAPI won't be able to hit localhost.
+      // Is the user running this on a live domain or ngrok?
+      // Next.js URL is usually in NEXTAUTH_URL. We will set it.
+      const secret = (process.env.NEXTAUTH_SECRET || "").slice(0, 16)
+      // Only set it if it's not localhost, otherwise UseAPI will reject the URL format.
+      // Wait, the user said "coba di log dong hasil replyUrl yang di tangkep".
+      // That means UseAPI is successfully hitting the webhook! So NEXTAUTH_URL is a public domain (e.g. ngrok or deployed server).
+      if (appUrl) {
         basePayload.replyUrl = `${appUrl.replace(/\/$/, "")}/api/ai/image-callback?secret=${encodeURIComponent(secret)}`
         basePayload.replyRef = `jenna-${Date.now()}`
         console.log(`[image-generate] replyUrl set: ${basePayload.replyUrl}`)
@@ -222,11 +244,27 @@ async function handlePostResponse(
 ) {
   const useapiJobId = (data.jobid || data.jobId) as string | undefined
 
+  // UseAPI /images is SYNCHRONOUS — the response already contains the full
+  // media array.  Extract it now so we never lose it.
+  const media = extractMedia(data)
+
+  console.log(
+    `[image-generate] POST response: jobId=${useapiJobId}, media=${media.length}, async=${useAsync}`
+  )
+
   if (useAsync) {
+    // Store the result in DB cache so the very first client poll returns it.
+    if (useapiJobId && media.length > 0) {
+      await storeImageJobResult(useapiJobId, {
+        media,
+        timestamp: Date.now(),
+        status: "done",
+      })
+      console.log(`[image-generate] Cached ${media.length} images for job ${useapiJobId}`)
+    }
     if (useapiJobId) {
       await storeImageJobMeta(useapiJobId, { userId, creditCost, feature })
     }
-    console.log(`[image-generate] Async job started: ${useapiJobId}`)
     return NextResponse.json({ jobId: useapiJobId, status: "processing" })
   } else {
     console.log(`[image-generate] Sync job done: ${useapiJobId}`)
@@ -259,16 +297,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  // ── Fast path: check DB cache (populated by replyUrl webhook) ──
+  // ── Fast path: check DB cache (populated by polling completion) ──
   const cached = await getImageJobResult(useapiJobId)
-  if (cached) {
+  if (cached && cached.status === "error") {
+    return NextResponse.json(
+      { jobId: useapiJobId, status: "error", error: cached.error || "Generation failed" },
+      { status: 500 }
+    )
+  }
+  // Ignore cache if it erroneously stored an empty array
+  if (cached && cached.status === "done" && cached.media && cached.media.length > 0) {
     console.log(`[image-generate] Cache hit for job ${useapiJobId}`)
-    if (cached.status === "error") {
-      return NextResponse.json(
-        { jobId: useapiJobId, status: "error", error: cached.error || "Generation failed" },
-        { status: 500 }
-      )
-    }
     return NextResponse.json({
       jobId: useapiJobId,
       status: "done",
@@ -280,6 +319,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${USEAPI_BASE}/jobs/${useapiJobId}`, {
       headers: { Authorization: `Bearer ${apiToken}` },
+      cache: 'no-store'
     })
 
     if (!res.ok) {
@@ -323,7 +363,12 @@ export async function GET(req: NextRequest) {
 
       console.log(`[image-generate] Job ${useapiJobId} completed via polling. images=${media.length}`)
 
-      return NextResponse.json({ jobId: useapiJobId, status: "done", images: media })
+      return NextResponse.json({ 
+        jobId: useapiJobId, 
+        status: "done", 
+        images: media,
+        ...(media.length === 0 && { rawData: data })
+      })
     }
 
     return NextResponse.json({ jobId: useapiJobId, status: "processing" })

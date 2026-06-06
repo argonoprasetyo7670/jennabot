@@ -12,11 +12,26 @@ const REFUNDED_KEYS = new Set<string>()
  * Extract image URLs from UseAPI callback payload.
  */
 function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] {
+  const processMediaArray = (arr: any[]) => {
+    return arr.map((m) => {
+      const gen = m.image?.generatedImage
+      const rawMgId = gen?.mediaGenerationId
+      const resolvedMgId = rawMgId && typeof rawMgId === "object" ? rawMgId.mediaGenerationId : rawMgId
+      return {
+        url: gen?.fifeUrl || gen?.uri,
+        mediaGenerationId: resolvedMgId,
+      }
+    }).filter((m) => m.url)
+  }
+
+  if (Array.isArray(data.media)) return processMediaArray(data.media)
   if (Array.isArray(data.images)) return data.images as Record<string, unknown>[]
   
   const response = data.response as Record<string, unknown> | undefined
+  if (response && Array.isArray(response.media)) return processMediaArray(response.media)
   if (response && Array.isArray(response.images)) return response.images as Record<string, unknown>[]
 
+  // Handle async operations format
   if (response && Array.isArray(response.operations)) {
     return (response.operations as Record<string, unknown>[])
       .filter((op) => {
@@ -26,9 +41,11 @@ function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] 
       .map((op) => {
         const image = op.image as Record<string, unknown> | undefined
         const imageUrl = (image?.uri || image?.fifeUrl) as string | undefined
+        const rawMgId = op.mediaGenerationId
+        const resolvedMgId = rawMgId && typeof rawMgId === "object" ? (rawMgId as any).mediaGenerationId : rawMgId
         return {
           url: imageUrl,
-          mediaGenerationId: op.mediaGenerationId as string | undefined,
+          mediaGenerationId: resolvedMgId as string | undefined,
         }
       })
       .filter((m) => m.url)
@@ -49,6 +66,7 @@ export async function POST(req: NextRequest) {
   let body: Record<string, unknown>
   try {
     body = await req.json()
+    console.log("[image-callback] 🚀 RAW WEBHOOK PAYLOAD:", JSON.stringify(body, null, 2))
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
