@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
       model, text_prompt, duration, aspect_ratio, resolution, audio,
       email, imageAssetIds, videoAssetId, videoAssetId2, videoAssetId3,
       startFrameAssetId, endFrameAssetId, characterOrientation,
-      feature,
+      feature, asyncMode,
     } = body
 
     if (!model) {
@@ -184,7 +184,22 @@ export async function POST(req: NextRequest) {
     if (videoAssetId2) payload.videoAssetId2 = videoAssetId2
     if (videoAssetId3) payload.videoAssetId3 = videoAssetId3
 
-    console.log(`[runway/video-generate] Starting generation: model=${model}`)
+    if (asyncMode) {
+      const baseUrl = process.env.NEXTAUTH_URL || "https://jennabot.pro"
+      const secret = process.env.NEXTAUTH_SECRET || "fallback-secret"
+      payload.replyUrl = `${baseUrl}/api/runway/video-callback?secret=${encodeURIComponent(secret.slice(0, 8))}`
+
+      const metaInfo = {
+        userId: session.user.id,
+        prompt: text_prompt || null,
+        model: model,
+        aspectRatio: aspect_ratio || null,
+        feature: feature || "runway-video"
+      }
+      payload.replyRef = JSON.stringify(metaInfo)
+    }
+
+    console.log(`[runway/video-generate] Starting generation: model=${model}, async=${!!asyncMode}`)
 
     const response = await fetch(`${USEAPI_BASE}/videos/create`, {
       method: "POST",
@@ -214,7 +229,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Runway returns task with taskId
-    const taskId = data.task?.taskId || data.taskId
+    const taskId = (data.task as Record<string, unknown> | undefined)?.taskId || data.taskId
     if (!taskId) {
       console.error("[runway/video-generate] No taskId in response:", data)
       return NextResponse.json({ error: "Gagal memulai pembuatan video. Silakan coba lagi." }, { status: 500 })

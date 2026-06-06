@@ -34,6 +34,8 @@ export interface RunwayVideoParams {
   /** Motion Control specific */
   characterOrientation?: "image" | "video"
   feature?: string
+  /** If true, returns immediately without polling. Webhook handles the result. */
+  asyncMode?: boolean
 }
 
 export interface RunwayGeneratedVideo {
@@ -126,6 +128,11 @@ export async function generateRunwayVideo(
   }
 
   console.log(`[runway] Task started: ${taskId}`)
+
+  // If asyncMode is requested, return immediately without polling
+  if (params.asyncMode) {
+    return { taskId, videos: [] }
+  }
 
   // Step 2: Poll for results every 5 seconds (max 10 minutes for Runway)
   const POLL_INTERVAL = 5000

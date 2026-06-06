@@ -51,6 +51,7 @@ export default function SeedancePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedVideos, setGeneratedVideos] = useState<RunwayGeneratedVideo[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [previewVideo, setPreviewVideo] = useState<RunwayGeneratedVideo | null>(null)
   const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set())
   const [phase, setPhase] = useState("")
@@ -111,13 +112,13 @@ export default function SeedancePage() {
     if (isGenerating || (!prompt.trim() && referenceFiles.length === 0)) return
     setIsGenerating(true)
     setError(null)
+    setSuccessMsg(null)
     setGeneratedVideos([])
     setShowSettings(false)
 
     const jobId = `seedance-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 
     try {
-      // Add to queue for bell notification
       const queueJob: GenerationJob = {
         id: jobId, type: "video", prompt: prompt || "Seedance 2.0",
         model: MODEL_NAME, status: "uploading", progress: "Memulai...",
@@ -148,11 +149,11 @@ export default function SeedancePage() {
         }
       }
 
-      // Step 2: Generate video
-      setPhase("Membuat video dengan Seedance 2.0...")
-      updateJob(jobId, { status: "generating", progress: "Membuat video dengan Seedance 2.0..." })
+      // Step 2: Generate video (Async)
+      setPhase("Memasukkan ke antrean Seedance 2.0...")
+      updateJob(jobId, { status: "generating", progress: "Memasukkan ke antrean Seedance 2.0..." })
 
-      const result = await generateRunwayVideo({
+      await generateRunwayVideo({
         model: MODEL_ID,
         text_prompt: prompt || undefined,
         duration,
@@ -164,23 +165,29 @@ export default function SeedancePage() {
         videoAssetId2: videoAssetIds[1],
         videoAssetId3: videoAssetIds[2],
         feature: "seedance-2",
+        asyncMode: true,
       })
 
-      setGeneratedVideos(result.videos)
       setPhase("")
+      setSuccessMsg("Video berhasil diantrekan. Proses memakan waktu 10-30 menit. Video akan otomatis tersimpan di Gallery setelah selesai.")
       updateJob(jobId, {
-        status: "done", progress: undefined,
-        videos: result.videos.map((v) => ({ url: v.url, rawUrl: v.url })),
-        creditsDeducted: CREDIT_COST_RUNWAY, completedAt: new Date(),
+        status: "done",
+        progress: "Berhasil antre. Cek Gallery (10-30m)",
+        completedAt: new Date()
       })
-      window.dispatchEvent(new CustomEvent("credits-updated"))
+      
+      // Clear form
+      setPrompt("")
+      setReferenceFiles([])
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Generation failed"
       setError(msg)
       setPhase("")
       updateJob(jobId, {
-        status: "error", progress: undefined,
-        error: msg, completedAt: new Date(),
+        status: "error",
+        progress: undefined,
+        error: msg,
+        completedAt: new Date()
       })
     } finally {
       setIsGenerating(false)
@@ -216,8 +223,7 @@ export default function SeedancePage() {
               <div className="absolute -inset-4 rounded-full bg-orange-500/8 blur-2xl -z-10 animate-pulse" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-foreground/70">{phase || "Sedang membuat video..."}</p>
-              <p className="text-xs text-muted-foreground mt-1">Menggunakan {MODEL_NAME} • Hingga 10 menit</p>
+              <p className="text-sm font-medium text-foreground/70">{phase || "Menyiapkan..."}</p>
             </div>
           </div>
         ) : isEmpty ? (
@@ -274,10 +280,20 @@ export default function SeedancePage() {
         )}
 
         {error && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 max-w-md">
-            <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 backdrop-blur-sm">
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 max-w-md w-[90%]">
+            <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 backdrop-blur-sm shadow-xl">
               <span className="flex-1">{error}</span>
               <button onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-400"><XIcon className="h-4 w-4" /></button>
+            </div>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 max-w-md w-[90%] animate-fade-up">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400 backdrop-blur-sm shadow-xl">
+              <CheckIcon className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{successMsg}</span>
+              <button onClick={() => setSuccessMsg(null)} className="shrink-0 text-emerald-400/60 hover:text-emerald-400"><XIcon className="h-4 w-4" /></button>
             </div>
           </div>
         )}

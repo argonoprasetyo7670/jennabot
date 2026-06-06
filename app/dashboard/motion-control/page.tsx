@@ -38,6 +38,7 @@ export default function MotionControlPage() {
   const [phase, setPhase] = useState<Phase>("idle")
   const [generatedVideo, setGeneratedVideo] = useState<RunwayGeneratedVideo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [previewModal, setPreviewModal] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -102,6 +103,7 @@ export default function MotionControlPage() {
   const handleGenerate = async () => {
     if (!allReady || isProcessing) return
     setError(null)
+    setSuccessMsg(null)
     setGeneratedVideo(null)
     setSaved(false)
 
@@ -126,11 +128,11 @@ export default function MotionControlPage() {
       updateJob(jobId, { progress: PHASE_LABELS["uploading-video"] })
       const videoResult = await uploadRunwayAsset(performanceVideo!.file)
 
-      // Step 3: Generate motion control video
+      // Step 3: Generate motion control video (Async)
       setPhase("generating")
       updateJob(jobId, { status: "generating", progress: PHASE_LABELS.generating })
 
-      const result = await generateRunwayVideo({
+      await generateRunwayVideo({
         model: MODEL_ID,
         text_prompt: customPrompt || undefined,
         imageAssetIds: [imageResult.assetId],
@@ -139,26 +141,32 @@ export default function MotionControlPage() {
         audio: audioEnabled,
         resolution,
         feature: "motion-control",
+        asyncMode: true,
       })
 
-      const vid = result.videos[0]
-      if (!vid) throw new Error("Tidak ada video yang dihasilkan")
-
-      setGeneratedVideo(vid)
-      setPhase("done")
+      setPhase("idle")
+      setSuccessMsg("Video berhasil diantrekan. Proses memakan waktu 10-30 menit. Video akan otomatis tersimpan di Gallery setelah selesai.")
       updateJob(jobId, {
-        status: "done", progress: undefined,
-        videos: [{ url: vid.url, rawUrl: vid.url }],
-        creditsDeducted: CREDIT_COST_RUNWAY, completedAt: new Date(),
+        status: "done",
+        progress: "Berhasil antre. Cek Gallery (10-30m)",
+        completedAt: new Date()
       })
-      window.dispatchEvent(new CustomEvent("credits-updated"))
+      
+      // Clear inputs
+      if (characterImage) URL.revokeObjectURL(characterImage.preview)
+      if (performanceVideo) URL.revokeObjectURL(performanceVideo.preview)
+      setCharacterImage(null)
+      setPerformanceVideo(null)
+      setCustomPrompt("")
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Generation failed"
       setError(msg)
-      setPhase("error")
+      setPhase("idle")
       updateJob(jobId, {
-        status: "error", progress: undefined,
-        error: msg, completedAt: new Date(),
+        status: "error",
+        progress: undefined,
+        error: msg,
+        completedAt: new Date()
       })
     }
   }
@@ -328,7 +336,16 @@ export default function MotionControlPage() {
           {error && (
             <div className="mb-8 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
               <span className="flex-1">{error}</span>
-              <button onClick={() => { setError(null); setPhase("idle") }} className="shrink-0 text-red-400/60 hover:text-red-400"><XIcon className="h-4 w-4" /></button>
+              <button onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-400"><XIcon className="h-4 w-4" /></button>
+            </div>
+          )}
+
+          {/* Success message */}
+          {successMsg && (
+            <div className="mb-8 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400 animate-fade-up">
+              <CheckIcon className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{successMsg}</span>
+              <button onClick={() => setSuccessMsg(null)} className="shrink-0 text-emerald-400/60 hover:text-emerald-400"><XIcon className="h-4 w-4" /></button>
             </div>
           )}
 

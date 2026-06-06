@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       assetId: data.assetId,
       url: data.url,
-      mediaType: data.type?.type || "image",
+      mediaType: (data.type as Record<string, unknown>)?.type || "image",
       name: data.name,
     })
   } catch (error) {
