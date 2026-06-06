@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
     // Build base payload (without captcha)
     const basePayload: Record<string, unknown> = {
       prompt,
-      model: model || "imagen-4",
-      aspectRatio: aspectRatio || "16:9",
+      model: model || "nano-banana-pro",
+      aspectRatio: aspectRatio || "9:16",
       count: imageCount,
     }
 

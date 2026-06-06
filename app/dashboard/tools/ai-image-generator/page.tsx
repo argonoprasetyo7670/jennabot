@@ -124,6 +124,31 @@ export default function AIImageGeneratorPage() {
     setActiveJobId(jobId)
   }
 
+  // Auto-save all images to gallery when job completes
+  useEffect(() => {
+    if (activeJob?.status !== "done") return
+    const images = activeJob.images || []
+    images.forEach(img => {
+      if (!img.url || savedImages.has(img.url)) return
+      fetch("/api/gallery/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: img.url,
+          type: "image",
+          prompt: activeJob.prompt || "",
+          model: activeJob.model || "",
+          aspectRatio: img.aspectRatio || "",
+          mediaGenerationId: img.mediaGenerationId || "",
+          sourceAction: "image-generator",
+        }),
+      }).then(res => {
+        if (res.ok) setSavedImages(prev => new Set(prev).add(img.url))
+      }).catch(() => {})
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeJob?.status])
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     const remaining = currentModel.maxRefs - referenceImages.length

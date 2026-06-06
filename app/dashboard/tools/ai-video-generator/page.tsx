@@ -119,6 +119,31 @@ export default function AIVideoGeneratorPage() {
     setActiveJobId(jobId)
   }
 
+  // Auto-save all videos to gallery when job completes
+  useEffect(() => {
+    if (activeJob?.status !== "done") return
+    const videos = activeJob.videos || []
+    videos.forEach(vid => {
+      if (!vid.url || savedVideos.has(vid.url)) return
+      fetch("/api/gallery/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: vid.url,
+          type: "video",
+          prompt: activeJob.prompt || "",
+          model: activeJob.model || "",
+          aspectRatio: vid.aspectRatio || "",
+          mediaGenerationId: vid.mediaGenerationId || "",
+          sourceAction: "video-generator",
+        }),
+      }).then(res => {
+        if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
+      }).catch(() => {})
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeJob?.status])
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     const maxRefs = 3

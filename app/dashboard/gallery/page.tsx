@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { cn } from "@/lib/utils"
+import { cn, isMediaUrlExpired, mediaUrlExpiryLabel } from "@/lib/utils"
 import { downloadMedia } from "@/lib/download"
 import {
   ImageIcon,
@@ -20,6 +20,7 @@ import {
   SparklesIcon,
   CalendarIcon,
   FilterIcon,
+  ClockIcon,
 } from "lucide-react"
 
 /* ─── Types ─── */
@@ -302,20 +303,33 @@ export default function GalleryPage() {
                     >
                       {item.type === "video" ? (
                         <div className="relative h-full w-full">
-                          <video
-                            src={item.gcsUrl}
-                            className="h-full w-full object-cover"
-                            muted
-                            playsInline
-                            preload="metadata"
-                            onMouseOver={e => (e.target as HTMLVideoElement).play?.()}
-                            onMouseOut={e => { const v = e.target as HTMLVideoElement; v.pause?.(); v.currentTime = 0 }}
-                          />
+                          {isMediaUrlExpired(item.gcsUrl) ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted/40">
+                              <ClockIcon className="h-6 w-6 text-muted-foreground/40" />
+                              <span className="text-[10px] text-muted-foreground/50">Kadaluarsa</span>
+                            </div>
+                          ) : (
+                            <video
+                              src={item.gcsUrl}
+                              className="h-full w-full object-cover"
+                              muted
+                              playsInline
+                              preload="metadata"
+                              onError={() => {}}
+                              onMouseOver={e => (e.target as HTMLVideoElement).play?.()}
+                              onMouseOut={e => { const v = e.target as HTMLVideoElement; v.pause?.(); v.currentTime = 0 }}
+                            />
+                          )}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm opacity-80 group-hover:opacity-100 transition">
                               <VideoIcon className="h-4 w-4 text-white" />
                             </div>
                           </div>
+                        </div>
+                      ) : isMediaUrlExpired(item.gcsUrl) ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted/40">
+                          <ClockIcon className="h-6 w-6 text-muted-foreground/40" />
+                          <span className="text-[10px] text-muted-foreground/50">Kadaluarsa</span>
                         </div>
                       ) : (
                         <Image
@@ -325,6 +339,7 @@ export default function GalleryPage() {
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                           unoptimized
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                          onError={() => {}}
                         />
                       )}
 
@@ -334,6 +349,16 @@ export default function GalleryPage() {
                           {item.prompt && (
                             <p className="text-[10px] text-white/80 line-clamp-2 mb-2 leading-relaxed">{item.prompt}</p>
                           )}
+                          {/* Expiry countdown */}
+                          {(() => {
+                            const label = mediaUrlExpiryLabel(item.gcsUrl)
+                            if (!label || label === "Kadaluarsa") return null
+                            return (
+                              <p className="text-[9px] text-amber-300/80 mb-1.5 flex items-center gap-1">
+                                <ClockIcon className="h-2.5 w-2.5" /> {label}
+                              </p>
+                            )
+                          })()}
                           <div className="flex items-center gap-1">
                             <button
                               onClick={e => { e.stopPropagation(); handleDownload(item) }}
@@ -386,6 +411,22 @@ export default function GalleryPage() {
                           {formatDate(item.createdAt)}
                         </span>
                       </div>
+                      {/* Expiry badge — always visible */}
+                      {(() => {
+                        const expired = isMediaUrlExpired(item.gcsUrl)
+                        const label = mediaUrlExpiryLabel(item.gcsUrl)
+                        if (!label) return null
+                        return (
+                          <div className={`mt-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 w-fit text-[9px] font-medium ${
+                            expired
+                              ? "bg-red-500/10 text-red-400"
+                              : "bg-amber-500/10 text-amber-400"
+                          }`}>
+                            <ClockIcon className="h-2.5 w-2.5" />
+                            {label}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -450,14 +491,27 @@ export default function GalleryPage() {
 
             <div className={cn("relative w-full max-w-3xl", previewItem.type === "video" ? "max-h-[70vh]" : "max-h-[70vh] aspect-square")} onClick={e => e.stopPropagation()}>
               {previewItem.type === "video" ? (
-                <video
-                  key={previewItem.id}
-                  src={previewItem.gcsUrl}
-                  className="w-full max-h-[70vh] rounded-2xl object-contain"
-                  controls
-                  autoPlay
-                  playsInline
-                />
+                isMediaUrlExpired(previewItem.gcsUrl) ? (
+                  <div className="flex h-64 w-full flex-col items-center justify-center gap-3 rounded-2xl bg-muted/40">
+                    <ClockIcon className="h-10 w-10 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground/60">URL video ini sudah kadaluarsa</p>
+                  </div>
+                ) : (
+                  <video
+                    key={previewItem.id}
+                    src={previewItem.gcsUrl}
+                    className="w-full max-h-[70vh] rounded-2xl object-contain"
+                    controls
+                    autoPlay
+                    playsInline
+                    onError={() => {}}
+                  />
+                )
+              ) : isMediaUrlExpired(previewItem.gcsUrl) ? (
+                <div className="flex h-64 w-full flex-col items-center justify-center gap-3 rounded-2xl bg-muted/40">
+                  <ClockIcon className="h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground/60">URL gambar ini sudah kadaluarsa</p>
+                </div>
               ) : (
                 <Image
                   src={previewItem.gcsUrl}
@@ -465,6 +519,7 @@ export default function GalleryPage() {
                   fill
                   className="object-contain rounded-2xl"
                   unoptimized
+                  onError={() => {}}
                 />
               )}
             </div>

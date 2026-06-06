@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import {
+  deductCredits,
+  storeVideoJobMeta,
+  storeVideoJobResult,
+  getVideoJobResult,
+} from "@/lib/credits"
 
 const USEAPI_BASE = "https://api.useapi.net/v1/google-flow"
 const CAPTCHA_BROKER_URL = process.env.CAPTCHA_BROKER_URL || "http://localhost:4000"
@@ -41,43 +47,6 @@ async function getCaptchaToken(): Promise<string | null> {
   } catch (err) {
     console.warn("Captcha broker unavailable:", err)
     return null
-  }
-}
-
-/**
- * Deduct credits for a user. Returns amount deducted.
- */
-async function deductCredits(userId: string, videoCount: number, feature: string): Promise<number> {
-  const amount = videoCount * CREDIT_COST_VIDEO
-  try {
-    const credits = await prisma.user_credits.findUnique({ where: { userId } })
-    const currentBalance = credits?.balance ?? 0
-    const newBalance = Math.max(0, currentBalance - amount)
-
-    await prisma.$transaction([
-      prisma.user_credits.upsert({
-        where: { userId },
-        update: { balance: newBalance, updatedAt: new Date() },
-        create: { id: crypto.randomUUID(), userId, balance: newBalance, updatedAt: new Date() },
-      }),
-      prisma.credit_transactions.create({
-        data: {
-          id: crypto.randomUUID(),
-          userId,
-          type: "deduct",
-          amount: -amount,
-          balance: newBalance,
-          description: `Video generation (${feature})`,
-          feature,
-        },
-      }),
-    ])
-
-    console.log(`[video-generate] Credits deducted: ${amount} for user ${userId}. Balance: ${currentBalance} → ${newBalance}`)
-    return amount
-  } catch (err) {
-    console.error(`[video-generate] Failed to deduct credits for user ${userId}:`, err)
-    return 0
   }
 }
 
@@ -187,12 +156,22 @@ export async function POST(req: NextRequest) {
       count: videoCount,
     }
 
-    if (useAsync) basePayload.async = true // Tell UseAPI to run async!
+    if (useAsync) basePayload.async = true
     if (seed !== undefined && seed !== null) basePayload.seed = seed
     if (email) basePayload.email = email
     if (startImage) basePayload.startImage = startImage
     if (endImage) basePayload.endImage = endImage
     if (voice) basePayload.voice = voice
+
+    // Attach replyUrl when running in production (not localhost)
+    const appUrl = process.env.NEXTAUTH_URL || ""
+    const isProduction = !appUrl.includes("localhost") && !appUrl.includes("127.0.0.1")
+    if (useAsync && isProduction) {
+      const secret = (process.env.NEXTAUTH_SECRET || "").slice(0, 16)
+      basePayload.replyUrl = `${appUrl.replace(/\/$/, "")}/api/ai/video-callback?secret=${encodeURIComponent(secret)}`
+      basePayload.replyRef = `jenna-${Date.now()}`
+      console.log(`[video-generate] replyUrl set: ${basePayload.replyUrl}`)
+    }
 
     if (referenceImages && Array.isArray(referenceImages)) {
       referenceImages.forEach((ref: string, i: number) => {
@@ -276,53 +255,20 @@ async function handlePostResponse(
   const useapiJobId = (data.jobid || data.jobId) as string | undefined
 
   if (useAsync) {
-    // Async mode: UseAPI accepted the job, returns jobId. Client polls our GET endpoint.
-    console.log(`[video-generate] Async job started: ${useapiJobId}`)
-
-    // Store metadata for credit deduction when client picks up results
+    // Async mode: store job metadata so the callback/GET can deduct credits
     if (useapiJobId) {
-      // We use a simple Map to track userId/feature for this job
-      deductedJobs.set(`meta:${useapiJobId}`, Date.now())
-      // Store user info (piggyback on the deductedJobs map)
-      deductedJobs.set(`user:${useapiJobId}`, 0) // placeholder
-      // Actually, let's use a separate map for job metadata
+      await storeVideoJobMeta(useapiJobId, { userId, videoCount, feature })
     }
-
-    return NextResponse.json({
-      jobId: useapiJobId,
-      status: "processing",
-    })
+    console.log(`[video-generate] Async job started: ${useapiJobId}`)
+    return NextResponse.json({ jobId: useapiJobId, status: "processing" })
   } else {
     // Sync mode: UseAPI returned the full result. Deduct credits and return.
     const media = extractMedia(data)
     console.log(`[video-generate] Sync job done: ${useapiJobId}, videos=${media.length}`)
-
-    const deducted = await deductCredits(userId, videoCount, feature)
-
-    return NextResponse.json({
-      jobId: useapiJobId || "",
-      status: "done",
-      media,
-      creditsDeducted: deducted,
-    })
+    const deducted = await deductCredits(userId, videoCount * CREDIT_COST_VIDEO, feature)
+    return NextResponse.json({ jobId: useapiJobId || "", status: "done", media, creditsDeducted: deducted })
   }
 }
-
-/**
- * In-memory store for job metadata (userId, videoCount, feature).
- * Needed to deduct credits when polling completes.
- */
-interface JobMeta { userId: string; videoCount: number; feature: string }
-const jobMeta = new Map<string, JobMeta>()
-
-// Cleanup jobMeta every 5 minutes
-setInterval(() => {
-  // jobMeta doesn't have timestamps, so clean based on deductedJobs
-  if (jobMeta.size > 100) {
-    const entries = [...jobMeta.entries()]
-    entries.slice(0, entries.length - 50).forEach(([k]) => jobMeta.delete(k))
-  }
-}, 5 * 60_000)
 
 /**
  * GET /api/ai/video-generate?jobId=xxx
@@ -341,15 +287,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
   }
 
-  // Auth check — need userId for credit deduction
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  // ── Fast path: check DB cache (populated by replyUrl webhook) ──
+  const cached = await getVideoJobResult(useapiJobId)
+  if (cached) {
+    console.log(`[video-generate] Cache hit for job ${useapiJobId} (webhook delivered)`)
+    if (cached.status === "error") {
+      return NextResponse.json(
+        { jobId: useapiJobId, status: "error", error: cached.error || "Generation failed" },
+        { status: 500 }
+      )
+    }
+    return NextResponse.json({
+      jobId: useapiJobId,
+      status: "done",
+      media: cached.media,
+      creditsDeducted: cached.creditsDeducted,
+    })
+  }
+
+  // ── Fallback: poll UseAPI directly ──
   try {
-    // Fetch job status from UseAPI
-    // DO NOT use encodeURIComponent — UseAPI jobIds contain : and @ that must stay as-is
     const res = await fetch(`${USEAPI_BASE}/jobs/${useapiJobId}`, {
       headers: { Authorization: `Bearer ${apiToken}` },
     })
@@ -357,11 +319,9 @@ export async function GET(req: NextRequest) {
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
       console.error(`[video-generate] Poll error ${res.status} for ${useapiJobId}:`, errData)
-      
       if (res.status === 404) {
-        return NextResponse.json({ jobId: useapiJobId, status: "processing" }) // Job might not be registered yet
+        return NextResponse.json({ jobId: useapiJobId, status: "processing" })
       }
-      
       return NextResponse.json(
         { jobId: useapiJobId, status: "error", error: (errData as Record<string, string>).error || `Poll failed: ${res.status}` },
         { status: 500 }
@@ -371,12 +331,10 @@ export async function GET(req: NextRequest) {
     const data = await res.json() as Record<string, unknown>
     const useapiStatus = data.status as string
 
-    // Still processing
     if (useapiStatus === "created" || useapiStatus === "started") {
       return NextResponse.json({ jobId: useapiJobId, status: "processing" })
     }
 
-    // Failed
     if (useapiStatus === "failed") {
       return NextResponse.json(
         { jobId: useapiJobId, status: "error", error: (data.error as string) || "Video generation failed" },
@@ -384,31 +342,32 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Completed — extract media and deduct credits
     if (useapiStatus === "completed") {
       const media = extractMedia(data)
 
-      // Deduct credits (only once)
+      // Deduct credits (only once per job)
       let creditsDeducted = 0
       const deductKey = `deducted:${useapiJobId}`
       if (!deductedJobs.has(deductKey)) {
         const videoCount = media.length || 1
         const feat = (data.request as Record<string, unknown>)?.model as string || "video-generator"
-        creditsDeducted = await deductCredits(session.user.id, videoCount, `video-${feat}`)
+        creditsDeducted = await deductCredits(session.user.id, videoCount * CREDIT_COST_VIDEO, `video-${feat}`)
         deductedJobs.set(deductKey, Date.now())
       }
 
-      console.log(`[video-generate] Job ${useapiJobId} completed. videos=${media.length}`)
-
-      return NextResponse.json({
-        jobId: useapiJobId,
-        status: "done",
+      // Also cache to DB (so subsequent polls are instant even if webhook didn't arrive)
+      await storeVideoJobResult(useapiJobId, {
         media,
         creditsDeducted,
+        timestamp: Date.now(),
+        status: "done",
       })
+
+      console.log(`[video-generate] Job ${useapiJobId} completed via polling. videos=${media.length}`)
+
+      return NextResponse.json({ jobId: useapiJobId, status: "done", media, creditsDeducted })
     }
 
-    // Unknown status
     return NextResponse.json({ jobId: useapiJobId, status: "processing" })
   } catch (error) {
     console.error(`[video-generate] Poll error for ${useapiJobId}:`, error)

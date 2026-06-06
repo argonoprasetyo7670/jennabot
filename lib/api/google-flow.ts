@@ -134,10 +134,18 @@ export async function generateImages(params: GenerateImageParams): Promise<Gener
     .map((m: Record<string, unknown>) => {
       const gen = (m.image as Record<string, unknown>)?.generatedImage as Record<string, unknown> | undefined
       if (!gen?.fifeUrl) return null
+
+      // mediaGenerationId can be a nested object { mediaGenerationId: "..." } or a plain string
+      const rawMgId = gen.mediaGenerationId
+      const resolvedMediaId: string | undefined =
+        rawMgId && typeof rawMgId === "object"
+          ? ((rawMgId as Record<string, unknown>).mediaGenerationId as string | undefined)
+          : (rawMgId as string | undefined)
+
       return {
         url: gen.fifeUrl as string,
         seed: gen.seed as number | undefined,
-        mediaGenerationId: gen.mediaGenerationId as string | undefined,
+        mediaGenerationId: resolvedMediaId,
         aspectRatio: gen.aspectRatio as string | undefined,
         modelNameType: gen.modelNameType as string | undefined,
       }
@@ -210,9 +218,18 @@ export function downloadBase64Image(base64: string, filename: string) {
 
 /* ─── Video Generation ─── */
 
-export type VideoModel = "veo-3.1-quality" | "veo-3.1-fast" | "veo-3.1-lite" | "veo-3.1-lite-low-priority"
-export type VideoAspectRatio = "landscape" | "portrait"
-export type VideoDuration = 4 | 6 | 8
+export type VideoModel =
+  | "veo-3.1-quality"
+  | "veo-3.1-fast"
+  | "veo-3.1-lite"
+  | "veo-3.1-lite-low-priority"
+  | "omni-flash"
+
+/** Veo supports 1:1, 4:3, 3:4 in addition to landscape/portrait. omni-flash: landscape | portrait only. */
+export type VideoAspectRatio = "landscape" | "portrait" | "1:1" | "4:3" | "3:4"
+
+/** Veo: 4/6/8 (4 & 6 are Ultra-only). omni-flash: 4/6/8/10. V2V edit: ignored. */
+export type VideoDuration = 4 | 6 | 8 | 10
 
 export interface GenerateVideoParams {
   prompt: string
@@ -229,8 +246,9 @@ export interface GenerateVideoParams {
 }
 
 export interface GeneratedVideo {
-  url: string         // Proxy URL for playback (Safari Range support)
-  rawUrl?: string     // Original Google URL (for download)
+  url: string              // Proxy URL for playback (Safari Range support)
+  rawUrl?: string          // Original Google signed URL (for download, ~24h expiry)
+  thumbnailUrl?: string    // Signed thumbnail URL (JPEG, ~24h expiry) — use for gallery previews
   seed?: number
   mediaGenerationId?: string
   model?: string
@@ -326,7 +344,8 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
             const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
             return {
               url: proxyUrl,
-              rawUrl: videoUrl, // Keep raw URL for download
+              rawUrl: videoUrl,
+              thumbnailUrl: m.thumbnailUrl as string | undefined,
               seed: gen?.seed as number | undefined,
               mediaGenerationId: m.mediaGenerationId as string | undefined,
               model: gen?.model as string | undefined,

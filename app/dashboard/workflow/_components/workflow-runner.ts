@@ -86,12 +86,20 @@ function getUpstreamData(
       const sourceOutput = nodeOutputs.get(edge.source)
       if (sourceOutput) {
         inputs[edge.targetHandle] = sourceOutput[edge.sourceHandle]
+
+        // Auto-propagate _uploadEmail from any connected upstream node.
+        // This ensures videoGenNode always uses the same Google account as imageGenNode
+        // without needing a dedicated edge, preventing "startImage incorrect format" errors.
+        if (sourceOutput._uploadEmail && !inputs._uploadEmail) {
+          inputs._uploadEmail = sourceOutput._uploadEmail
+        }
       }
     }
   }
 
   return inputs
 }
+
 
 /* ─── Node Executors ─── */
 
@@ -117,18 +125,39 @@ async function executeImageGenNode(
 
   if (signal?.aborted) throw new Error("Dibatalkan")
 
-  // Collect reference images if any
+  // Collect reference IDs from node's own uploaded references (via UI)
   const refPreviews = nd._refPreviews as { uploaded?: { mediaGenerationId: string } }[] || []
-  const refs = refPreviews
+  const localRefs = refPreviews
     .filter(r => r.uploaded?.mediaGenerationId)
     .map(r => r.uploaded!.mediaGenerationId)
+
+  // Also collect references connected via edge (URL → upload → mediaGenerationId)
+  let email = (nd._uploadEmail as string) || undefined
+  const connectedRefUrls: string[] = []
+  if (inputs.references) {
+    const raw = inputs.references
+    const urls = Array.isArray(raw) ? (raw as string[]) : [raw as string]
+    urls.forEach(u => { if (u) connectedRefUrls.push(u) })
+  }
+
+  const connectedRefs: string[] = []
+  for (const url of connectedRefUrls) {
+    if (signal?.aborted) throw new Error("Dibatalkan")
+    try {
+      const uploaded = await uploadImageFromUrl(url, email)
+      if (!email) email = uploaded.email
+      connectedRefs.push(uploaded.mediaGenerationId)
+    } catch { /* skip failed refs */ }
+  }
+
+  const refs = [...localRefs, ...connectedRefs]
 
   const result = await generateImages({
     prompt: prompt.trim(),
     model: ((nd.model as string) || "nano-banana-2") as "nano-banana-2",
     aspectRatio: ((nd.aspectRatio as string) || "9:16") as "9:16",
     count: (nd.count as number) || 1,
-    ...(refs.length > 0 ? { references: refs, email: (nd._uploadEmail as string) || undefined } : {}),
+    ...(refs.length > 0 ? { references: refs, email } : {}),
   })
 
   return {
@@ -137,6 +166,8 @@ async function executeImageGenNode(
     _selectedIdx: 0,
     selectedImage: result.images[0]?.url || "",
     images: result.images.map(i => i.url),
+    // Pass email downstream so videoGenNode uses the same Google account
+    _uploadEmail: email || "",
   }
 }
 
@@ -148,19 +179,26 @@ async function executeVideoGenNode(
   const nd = node.data as Record<string, unknown>
   const prompt = (inputs.prompt as string) || (nd._localPrompt as string) || ""
   let startImageId = (inputs.startImage as string) || undefined
-  
+
+  // Email passed from upstream imageGenNode (same Google account required)
+  const upstreamEmail = (inputs._uploadEmail as string) || (nd._uploadEmail as string) || undefined
+  let videoEmail = upstreamEmail
+
   if (!prompt.trim()) {
     throw new Error("Prompt kosong")
   }
 
   if (signal?.aborted) throw new Error("Dibatalkan")
 
-  // If startImage is a URL (from imageGenNode output), upload it first to get mediaGenerationId
+  // If startImage is a URL (from imageGenNode output), upload it to get mediaGenerationId.
+  // CRITICAL: Use the same email as imageGenNode to stay on the same Google account.
   if (startImageId && (startImageId.startsWith("http") || startImageId.startsWith("/api/ai/image-download"))) {
     try {
-      const uploaded = await uploadImageFromUrl(startImageId)
+      const uploaded = await uploadImageFromUrl(startImageId, videoEmail)
       startImageId = uploaded.mediaGenerationId
-    } catch {
+      if (!videoEmail) videoEmail = uploaded.email
+    } catch (err) {
+      console.error("[videoGen] startImage upload failed:", err)
       throw new Error("Gagal upload start image. Coba lagi.")
     }
   }
@@ -176,6 +214,7 @@ async function executeVideoGenNode(
     aspectRatio: arMap[(nd.aspectRatio as string) || "16:9"] || "landscape",
     duration: (durMap[(nd.duration as string) || "8s"] || 8) as 8,
     startImage: startImageId,
+    ...(videoEmail ? { email: videoEmail } : {}),
   })
 
   const vid = result.videos[0]

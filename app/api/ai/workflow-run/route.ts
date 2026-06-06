@@ -106,16 +106,40 @@ function getUpstreamData(
   nodeOutputs: Map<string, Record<string, unknown>>
 ): Record<string, unknown> {
   const inputs: Record<string, unknown> = {}
+  const refsAcc: string[] = [] // accumulate multiple references → array
+
   for (const edge of edges) {
     if (edge.target === nodeId && edge.sourceHandle && edge.targetHandle) {
       const sourceOut = nodeOutputs.get(edge.source)
-      if (sourceOut && sourceOut[edge.sourceHandle] !== undefined) {
-        inputs[edge.targetHandle] = sourceOut[edge.sourceHandle]
+      if (!sourceOut) continue
+
+      const value = sourceOut[edge.sourceHandle]
+      if (value === undefined || value === null || value === "") continue
+
+      // References from upload nodes — collect into array (multiple edges all target "references")
+      if (edge.targetHandle === "references") {
+        if (Array.isArray(value)) refsAcc.push(...(value as string[]))
+        else refsAcc.push(value as string)
+        continue
+      }
+
+      inputs[edge.targetHandle] = value
+
+      // Auto-propagate _uploadEmail and _selectedMediaId from any connected upstream node.
+      // This ensures videoGenNode always uses the same Google account without a dedicated edge.
+      if (sourceOut._uploadEmail && !inputs._uploadEmail) {
+        inputs._uploadEmail = sourceOut._uploadEmail
+      }
+      if (sourceOut._selectedMediaId && !inputs._selectedMediaId) {
+        inputs._selectedMediaId = sourceOut._selectedMediaId
       }
     }
   }
+
+  if (refsAcc.length > 0) inputs.references = refsAcc
   return inputs
 }
+
 
 /* ─── Individual node executors ─── */
 
@@ -196,37 +220,76 @@ async function executeNode(
       if (!prompt.trim()) throw new Error("Prompt kosong untuk Image Gen")
 
       const imageCount = (nd.count as number) || 1
+
+      // Collect references from upstream upload nodes (via edges)
+      const refIds = (inputs.references as string[]) || []
+      const validRefs = refIds.filter(Boolean)
+
+      // Email from upload nodes (for Google account pinning)
+      const uploadEmail = (inputs._uploadEmail as string) || undefined
+
       const payload: Record<string, unknown> = {
         prompt: prompt.trim(),
-        model: (nd.model as string) || "nano-banana-2",
+        model: (nd.model as string) || "nano-banana-pro",
         aspectRatio: (nd.aspectRatio as string) || "9:16",
         count: imageCount,
       }
 
-      // Credits are deducted by /api/ai/image-generate — call it internally
-      // For server-side, we call UseAPI directly and handle credits here
-      const creditCost = imageCount * 1 // CREDIT_COST_IMAGE
+      if (validRefs.length > 0) {
+        payload.references = validRefs
+        if (uploadEmail) payload.email = uploadEmail
+      }
+
+      // Deduct credits before generation
+      const creditCost = imageCount * 1
       await deductWorkflowCredits(userId, creditCost, "workflow-image", `Workflow: ${imageCount} image(s)`)
 
       const data = await callImageGenerate(payload)
       const media = (data.media || []) as Record<string, unknown>[]
-      const images = media.map((m: Record<string, unknown>) => {
-        const gen = (m.image as Record<string, unknown>)?.generatedImage as Record<string, unknown> | undefined
-        return gen?.fifeUrl as string
-      }).filter(Boolean) as string[]
 
+      // Extract both the display URL (fifeUrl) and the stable mediaGenerationId
+      interface ImageItem { url: string; mediaGenerationId?: string; email?: string }
+      const images: ImageItem[] = media.map((m: Record<string, unknown>) => {
+        const gen = (m.image as Record<string, unknown>)?.generatedImage as Record<string, unknown> | undefined
+        if (!gen?.fifeUrl) return null
+
+        // mediaGenerationId can be nested: { mediaGenerationId: { mediaGenerationId: "..." } }
+        const rawMgId = gen.mediaGenerationId
+        const resolvedMediaId: string =
+          rawMgId && typeof rawMgId === "object"
+            ? ((rawMgId as Record<string, unknown>).mediaGenerationId as string) || ""
+            : (rawMgId as string) || ""
+
+        return {
+          url: gen.fifeUrl as string,
+          mediaGenerationId: resolvedMediaId,
+          email: (data.email as string) || uploadEmail || "",
+        }
+      }).filter(Boolean) as ImageItem[]
+
+      const firstImage = images[0]
       return {
         status: "done",
-        selectedImage: images[0] || "",
-        images,
+        selectedImage: firstImage?.url || "",
+        images: images.map(i => i.url),
         _generatedImages: images,
+        // Key outputs for videoGenNode — avoids re-upload and ensures same account
+        _selectedMediaId: firstImage?.mediaGenerationId || "",
+        _uploadEmail: firstImage?.email || uploadEmail || "",
       }
     }
 
     case "videoGenNode": {
       const prompt = (inputs.prompt as string) || (nd._localPrompt as string) || ""
-      const startImage = (inputs.startImage as string) || undefined
       if (!prompt.trim()) throw new Error("Prompt kosong untuk Video Gen")
+
+      // Prefer _selectedMediaId (mediaGenerationId from imageGen) over raw URL.
+      // CRITICAL: UseAPI requires mediaGenerationId, NOT a fifeUrl, for startImage.
+      const selectedMediaId = (inputs._selectedMediaId as string) || ""
+      const startImage = selectedMediaId || (inputs.startImage as string) || undefined
+
+      // Email pinning — must use same Google account as upstream imageGen
+      const email = (inputs._uploadEmail as string) || (nd._uploadEmail as string) || undefined
 
       const arMap: Record<string, string> = { "16:9": "landscape", "9:16": "portrait" }
       const durMap: Record<string, number> = { "5s": 4, "8s": 8 }
@@ -239,6 +302,7 @@ async function executeNode(
         count: 1,
       }
       if (startImage) payload.startImage = startImage
+      if (email) payload.email = email
 
       // Deduct credits before generation
       await deductWorkflowCredits(userId, 5, "workflow-video", "Workflow: video generation")
@@ -270,10 +334,14 @@ async function executeNode(
     }
 
     case "uploadNode": {
+      // Return mediaGenerationId so downstream imageGenNode can use it as a reference.
+      // The edge is: uploadNode.mediaGenerationId → imageGenNode.references
       return {
         status: "done",
-        selectedImage: nd.selectedImage || nd._preview,
-        selectedVideo: nd.selectedVideo,
+        mediaGenerationId: nd.mediaGenerationId || nd._mediaGenerationId || "",
+        selectedImage: nd.selectedImage || nd._preview || "",
+        selectedVideo: nd.selectedVideo || "",
+        _uploadEmail: (nd._uploadEmail as string) || "",
       }
     }
 
