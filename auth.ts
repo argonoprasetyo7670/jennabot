@@ -119,61 +119,73 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account, profile }) {
       // Handle Google OAuth: create or find user in our DB
       if (account?.provider === "google" && profile?.email) {
-        try {
-          let dbUser = await prisma.users.findUnique({
-            where: { email: profile.email },
-          });
+        let success = false;
+        let lastError = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            let dbUser = await prisma.users.findUnique({
+              where: { email: profile.email },
+            });
 
-          if (!dbUser) {
-            // Create new user from Google profile
-            dbUser = await prisma.users.create({
-              data: {
-                id: crypto.randomUUID(),
-                email: profile.email,
-                name: profile.name ?? profile.email.split("@")[0],
-                image: (profile as Record<string, unknown>).picture as string ?? null,
-                emailVerified: new Date(),
-                updatedAt: new Date(),
+            if (!dbUser) {
+              // Create new user from Google profile
+              dbUser = await prisma.users.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  email: profile.email,
+                  name: profile.name ?? profile.email.split("@")[0],
+                  image: (profile as Record<string, unknown>).picture as string ?? null,
+                  emailVerified: new Date(),
+                  updatedAt: new Date(),
+                },
+              });
+            }
+
+            // Store/update the OAuth account link
+            const existingAccount = await prisma.accounts.findUnique({
+              where: {
+                provider_providerAccountId: {
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                },
               },
             });
+
+            if (!existingAccount) {
+              await prisma.accounts.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  userId: dbUser.id,
+                  type: account.type,
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                  access_token: account.access_token ?? null,
+                  refresh_token: account.refresh_token ?? null,
+                  expires_at: account.expires_at ?? null,
+                  token_type: account.token_type ?? null,
+                  scope: account.scope ?? null,
+                  id_token: account.id_token ?? null,
+                  session_state: account.session_state as string ?? null,
+                },
+              });
+            }
+
+            // Set user.id so it's available in jwt callback
+            user.id = dbUser.id;
+            success = true;
+            break;
+          } catch (error: any) {
+            lastError = error;
+            console.warn(`[auth] Google sign-in DB error, retrying (${attempt}/3)...`, error?.message);
+            await new Promise((res) => setTimeout(res, 2000));
           }
+        }
 
-          // Store/update the OAuth account link
-          const existingAccount = await prisma.accounts.findUnique({
-            where: {
-              provider_providerAccountId: {
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-              },
-            },
-          });
-
-          if (!existingAccount) {
-            await prisma.accounts.create({
-              data: {
-                id: crypto.randomUUID(),
-                userId: dbUser.id,
-                type: account.type,
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-                access_token: account.access_token ?? null,
-                refresh_token: account.refresh_token ?? null,
-                expires_at: account.expires_at ?? null,
-                token_type: account.token_type ?? null,
-                scope: account.scope ?? null,
-                id_token: account.id_token ?? null,
-                session_state: account.session_state as string ?? null,
-              },
-            });
-          }
-
-          // Set user.id so it's available in jwt callback
-          user.id = dbUser.id;
-          return true;
-        } catch (error) {
-          console.error("Google sign-in error:", error);
+        if (!success) {
+          console.error("Google sign-in error after retries:", lastError);
           return false;
         }
+        return true;
       }
 
       return true;
