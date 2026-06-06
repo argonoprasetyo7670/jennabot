@@ -112,7 +112,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (useAsync) {
-      basePayload.async = true
       const appUrl = process.env.NEXTAUTH_URL || ""
       const isProduction = !appUrl.includes("localhost") && !appUrl.includes("127.0.0.1")
       if (isProduction) {

@@ -102,7 +102,7 @@ export default function WorkflowListPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-4 py-8">
           {/* ── Header ── */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
                 <GitMergeIcon className="h-5 w-5 text-violet-400" />

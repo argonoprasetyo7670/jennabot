@@ -15,7 +15,7 @@ import {
   ArrowLeftIcon, SaveIcon, Trash2Icon, Loader2Icon,
   CheckCircle2Icon, BotIcon,
   PanelRightCloseIcon, ScanEyeIcon, PencilRulerIcon, ZapIcon,
-  MousePointer2Icon, HandIcon, ChevronDownIcon,
+  MousePointer2Icon, HandIcon, ChevronDownIcon, PlusIcon,
   Undo2Icon, Redo2Icon, Maximize2Icon, Minimize2Icon, XIcon,
 } from "lucide-react"
 import {
@@ -37,7 +37,8 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
   const [saved, setSaved] = useState(false)
   const [autoSaved, setAutoSaved] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [activeTool, setActiveTool] = useState<"select" | "grab">("select")
+  const [activeTool, setActiveTool] = useState<"select" | "grab">("grab")
+  const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false)
   const [agentOpen, setAgentOpen] = useState(false)
   const [agentMessages, setAgentMessages] = useState<{ role: "user" | "agent"; text: string }[]>([])
   const [agentThinking, setAgentThinking] = useState(false)
@@ -229,32 +230,32 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* ─── Top Toolbar ─── */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-card/30 shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-card/30 shrink-0 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button onClick={() => isFullscreen ? setIsFullscreen(false) : router.push("/dashboard/workflow")}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition"
+              className="flex shrink-0 h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition"
               title={isFullscreen ? "Keluar Fullscreen" : "Kembali"}>
               <ArrowLeftIcon className="h-4 w-4" />
             </button>
-            <button onClick={handleUndo} disabled={!canUndo} className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-30" title="Undo (⌘Z)"><Undo2Icon className="h-3.5 w-3.5" /></button>
-            <button onClick={handleRedo} disabled={!canRedo} className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-30" title="Redo (⌘⇧Z)"><Redo2Icon className="h-3.5 w-3.5" /></button>
-            <div className="h-5 w-px bg-border/40" />
-            <span className="text-sm font-medium text-foreground truncate max-w-[160px]">{workflow?.name}</span>
-            {autoSaved && <span className="flex items-center gap-1 text-[10px] text-emerald-400/70"><CheckCircle2Icon className="h-3 w-3" /> Auto-saved</span>}
+            <button onClick={handleUndo} disabled={!canUndo} className="hidden sm:flex shrink-0 h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-30" title="Undo (⌘Z)"><Undo2Icon className="h-3.5 w-3.5" /></button>
+            <button onClick={handleRedo} disabled={!canRedo} className="hidden sm:flex shrink-0 h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-30" title="Redo (⌘⇧Z)"><Redo2Icon className="h-3.5 w-3.5" /></button>
+            <div className="hidden sm:block h-5 w-px bg-border/40" />
+            <span className="text-sm font-medium text-foreground truncate max-w-[120px] sm:max-w-[160px]">{workflow?.name}</span>
+            {autoSaved && <span className="hidden sm:flex items-center gap-1 text-[10px] text-emerald-400/70"><CheckCircle2Icon className="h-3 w-3" /> Auto-saved</span>}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button onClick={handleSave} disabled={saving}
-              className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition", saved ? "text-emerald-400" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+              className={cn("flex shrink-0 h-8 w-8 items-center justify-center rounded-lg transition", saved ? "text-emerald-400" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
               title={saved ? "Tersimpan" : "Simpan (⌘S)"}>
               {saving ? <Loader2Icon className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2Icon className="h-4 w-4" /> : <SaveIcon className="h-4 w-4" />}
             </button>
-            <button onClick={handleClear} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition" title="Bersihkan canvas"><Trash2Icon className="h-4 w-4" /></button>
-            <div className="h-5 w-px bg-border/50 mx-0.5" />
-            <button onClick={() => setIsFullscreen(f => !f)} className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition" title={isFullscreen ? "Keluar fullscreen" : "Fullscreen"}>
+            <button onClick={handleClear} className="hidden sm:flex shrink-0 h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition" title="Bersihkan canvas"><Trash2Icon className="h-4 w-4" /></button>
+            <div className="hidden sm:block h-5 w-px bg-border/50 mx-0.5" />
+            <button onClick={() => setIsFullscreen(f => !f)} className="hidden sm:flex shrink-0 h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition" title={isFullscreen ? "Keluar fullscreen" : "Fullscreen"}>
               {isFullscreen ? <Minimize2Icon className="h-4 w-4" /> : <Maximize2Icon className="h-4 w-4" />}
             </button>
             <button onClick={() => setAgentOpen(a => !a)}
-              className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition", agentOpen ? "bg-violet-500/15 text-violet-400" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+              className={cn("flex shrink-0 h-8 w-8 items-center justify-center rounded-lg transition", agentOpen ? "bg-violet-500/15 text-violet-400" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
               title="Workflow Agent">
               {agentOpen ? <PanelRightCloseIcon className="h-4 w-4" /> : <BotIcon className="h-4 w-4" />}
             </button>
@@ -294,33 +295,65 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
             </ReactFlow>
 
             {/* ─── Floating Bottom Toolbar ─── */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/80 shadow-xl px-2 py-1.5">
-              <div className="flex items-center gap-0.5 rounded-xl bg-muted/50 p-0.5">
-                <button onClick={() => setActiveTool("select")} className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all", activeTool === "select" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")} title="Select (V)"><MousePointer2Icon className="h-4 w-4" /></button>
-                <button onClick={() => setActiveTool("grab")} className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all", activeTool === "grab" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")} title="Grab (H)"><HandIcon className="h-4 w-4" /></button>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
+              {/* Mobile Palette Dropdown */}
+              {mobilePaletteOpen && (
+                <div className="sm:hidden grid grid-cols-4 gap-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/80 shadow-xl p-3 w-[280px] animate-in slide-in-from-bottom-2 fade-in">
+                  {PALETTE_ITEMS.map((item) => (
+                    <div key={item.type}
+                      onClick={() => { addNodeAtCenter(item.type); setMobilePaletteOpen(false); }}
+                      className="flex flex-col items-center justify-center gap-1.5 rounded-xl p-2 cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all active:scale-95"
+                    >
+                      <item.Icon className="h-5 w-5" />
+                      <span className="text-[9px] font-medium text-center leading-tight line-clamp-1">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Main Toolbar */}
+              <div className="flex items-center gap-1 rounded-2xl bg-card/95 backdrop-blur-xl border border-border/80 shadow-xl px-2 py-1.5 w-max max-w-[95vw] overflow-x-auto scrollbar-hide">
+                <div className="flex shrink-0 items-center gap-0.5 rounded-xl bg-muted/50 p-0.5">
+                  <button onClick={() => setActiveTool("select")} className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all", activeTool === "select" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")} title="Select (V)"><MousePointer2Icon className="h-4 w-4" /></button>
+                  <button onClick={() => setActiveTool("grab")} className={cn("flex h-8 w-8 items-center justify-center rounded-lg transition-all", activeTool === "grab" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")} title="Grab (H)"><HandIcon className="h-4 w-4" /></button>
+                </div>
+                <div className="h-6 w-px bg-border/60 mx-0.5 shrink-0" />
+                
+                {/* Desktop Inline Palette */}
+                <div className="hidden sm:flex shrink-0 items-center gap-0.5">
+                  {PALETTE_ITEMS.map((item) => (
+                    <div key={item.type} draggable
+                      onDragStart={(e) => { e.dataTransfer.setData("application/reactflow", item.type); e.dataTransfer.effectAllowed = "move" }}
+                      onClick={() => addNodeAtCenter(item.type)}
+                      className="relative flex h-8 w-8 items-center justify-center rounded-lg cursor-pointer active:cursor-grabbing text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all active:scale-90"
+                      title={item.label}>
+                      <item.Icon className="h-4 w-4" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile Toggle Palette Button */}
+                <button 
+                  onClick={() => setMobilePaletteOpen(o => !o)} 
+                  className={cn("sm:hidden flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all text-sm font-medium", mobilePaletteOpen ? "bg-violet-500/15 text-violet-400" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}
+                >
+                  <PlusIcon className="h-4 w-4" /> Tambah Node
+                </button>
+
+                <div className="hidden sm:block h-6 w-px bg-border/60 mx-0.5 shrink-0" />
+                <button className="hidden sm:flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition shrink-0">
+                  <span className="text-sm">ⓟ</span><span className="text-xs font-medium">Canvas</span><ChevronDownIcon className="h-3 w-3" />
+                </button>
               </div>
-              <div className="h-6 w-px bg-border/60 mx-0.5" />
-              <div className="flex items-center gap-0.5">
-                {PALETTE_ITEMS.map((item) => (
-                  <div key={item.type} draggable
-                    onDragStart={(e) => { e.dataTransfer.setData("application/reactflow", item.type); e.dataTransfer.effectAllowed = "move" }}
-                    onClick={() => addNodeAtCenter(item.type)}
-                    className="relative flex h-8 w-8 items-center justify-center rounded-lg cursor-pointer active:cursor-grabbing text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all active:scale-90"
-                    title={item.label}>
-                    <item.Icon className="h-4 w-4" />
-                  </div>
-                ))}
-              </div>
-              <div className="h-6 w-px bg-border/60 mx-0.5" />
-              <button className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition">
-                <span className="text-sm">ⓟ</span><span className="text-xs font-medium">Canvas</span><ChevronDownIcon className="h-3 w-3" />
-              </button>
             </div>
           </div>
 
           {/* ─── Workflow Agent Sidebar ─── */}
           {agentOpen && (
-            <div className="w-[320px] shrink-0 border-l border-border bg-card/50 backdrop-blur-md flex flex-col">
+            <div className={cn(
+              "shrink-0 border-l border-border bg-card/95 sm:bg-card/50 backdrop-blur-md flex flex-col z-20",
+              "absolute inset-y-0 right-0 w-full sm:w-[320px] sm:relative sm:inset-auto"
+            )}>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500/15"><BotIcon className="h-3.5 w-3.5 text-violet-400" /></div>
