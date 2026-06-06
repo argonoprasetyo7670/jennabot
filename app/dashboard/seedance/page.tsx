@@ -260,7 +260,7 @@ export default function SeedancePage() {
                         try {
                           const res = await fetch("/api/gallery/save", {
                             method: "POST", headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url: vid.url, type: "video", prompt, model: MODEL_ID, aspectRatio: ASPECT_RATIOS[selectedRatio], sourceAction: "seedance-2" }),
+                            body: JSON.stringify({ url: vid.url, type: "video", prompt, model: MODEL_ID, aspectRatio: ASPECT_RATIOS[selectedRatio], sourceAction: "seedance-2", mediaGenerationId: vid.assetId }),
                           })
                           if (res.ok) setSavedVideos((prev) => new Set(prev).add(vid.url))
                         } catch { /* ignore */ }

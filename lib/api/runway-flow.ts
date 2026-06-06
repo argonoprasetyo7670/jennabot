@@ -193,3 +193,64 @@ export async function generateRunwayVideo(
 
   throw new Error("Video generation timed out setelah 10 menit")
 }
+
+/**
+ * Upscale a Runway video to 4K.
+ * Preserves aspect ratio, upscale takes several minutes.
+ */
+export async function upscaleRunwayVideo(videoAssetId: string): Promise<RunwayGeneratedVideo> {
+  // Step 1: POST to upscale API
+  const startRes = await fetch("/api/runway/video-upscale", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ videoAssetId }),
+  })
+  
+  const startData = await startRes.json()
+  if (!startRes.ok) {
+    throw new Error(startData.error || `Upscale failed (${startRes.status})`)
+  }
+  
+  const taskId = startData.taskId
+  if (!taskId) throw new Error("No taskId returned")
+  
+  console.log(`[runway/upscale] Task started: ${taskId}`)
+  
+  // Step 2: Poll
+  const POLL_INTERVAL = 5000
+  const MAX_POLLS = 120 // 10 minutes max
+  
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL))
+    
+    try {
+      const pollRes = await fetch(`/api/runway/video-upscale?taskId=${encodeURIComponent(taskId)}`)
+      const pollData = await pollRes.json()
+      
+      if (pollData.status === "processing") {
+        const progress = pollData.progressRatio
+          ? `${Math.round(pollData.progressRatio * 100)}%`
+          : `${(i + 1) * 5}s`
+        console.log(`[runway/upscale] Task ${taskId}: processing... (${progress})`)
+        continue
+      }
+      
+      if (pollData.status === "error") throw new Error(pollData.error || "Upscale failed")
+      
+      if (pollData.status === "done") {
+        console.log(`[runway/upscale] Task ${taskId}: done!`)
+        const artifacts = pollData.artifacts || []
+        if (artifacts.length === 0) throw new Error("Upscale selesai namun tidak ada video yang dikembalikan")
+        return artifacts[0] as RunwayGeneratedVideo
+      }
+    } catch (err) {
+      if (i < MAX_POLLS - 1) {
+        console.warn(`[runway/upscale] Poll error (will retry):`, err)
+        continue
+      }
+      throw err
+    }
+  }
+  
+  throw new Error("Upscale timed out setelah 10 menit")
+}

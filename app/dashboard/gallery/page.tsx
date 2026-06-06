@@ -5,6 +5,7 @@ import Image from "next/image"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { cn, isMediaUrlExpired, mediaUrlExpiryLabel } from "@/lib/utils"
 import { downloadMedia } from "@/lib/download"
+import { upscaleRunwayVideo } from "@/lib/api/runway-flow"
 import {
   ImageIcon,
   VideoIcon,
@@ -54,6 +55,7 @@ export default function GalleryPage() {
   const [previewItem, setPreviewItem] = useState<GalleryItem | null>(null)
   const [previewIndex, setPreviewIndex] = useState(0)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [upscaling, setUpscaling] = useState<string | null>(null)
   const observerRef = useRef<HTMLDivElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -136,6 +138,45 @@ export default function GalleryPage() {
       }
     } catch { /* ignore */ } finally {
       setDeleting(null)
+    }
+  }
+
+  // Upscale to 4K using Topaz
+  const handleUpscale = async (item: GalleryItem) => {
+    if (!item.mediaGenerationId) {
+      alert("Asset ID tidak ditemukan untuk video ini. (Video lama tidak didukung)")
+      return
+    }
+    setUpscaling(item.id)
+    try {
+      const result = await upscaleRunwayVideo(item.mediaGenerationId)
+      
+      // Auto download
+      try {
+        await downloadMedia(result.url, `jenna-4k-${item.id.slice(0, 8)}.mp4`, "video")
+      } catch {
+        window.open(result.url, "_blank")
+      }
+      
+      // Save new 4K to gallery
+      await fetch("/api/gallery/save", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          url: result.url, 
+          type: "video", 
+          prompt: `[4K Upscaled] ${item.prompt || ""}`, 
+          model: "Topaz AI 4K", 
+          aspectRatio: item.aspectRatio, 
+          mediaGenerationId: result.assetId, 
+          sourceAction: item.sourceAction 
+        }),
+      })
+      alert("Video berhasil di-upscale ke 4K dan disimpan di Gallery!")
+      fetchItems()
+    } catch (err: any) {
+      alert(`Upscale gagal: ${err.message || "Unknown error"}`)
+    } finally {
+      setUpscaling(null)
     }
   }
 
@@ -555,6 +596,19 @@ export default function GalleryPage() {
             >
               <DownloadIcon className="h-4 w-4" /> Download
             </button>
+
+            {(previewItem.sourceAction === "seedance-2" || previewItem.sourceAction === "motion-control") && previewItem.model !== "Topaz AI 4K" && (
+              <button
+                onClick={() => handleUpscale(previewItem)}
+                disabled={upscaling === previewItem.id}
+                className="flex h-11 items-center gap-2 rounded-xl bg-violet-500/20 px-5 text-sm text-violet-300 transition hover:bg-violet-500/30 active:scale-95 disabled:opacity-40"
+                title="Tingkatkan resolusi ke 4K menggunakan Topaz AI"
+              >
+                {upscaling === previewItem.id ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+                <span className="hidden sm:inline">{upscaling === previewItem.id ? "Memproses..." : "Upscale 4K"}</span>
+                <span className="sm:hidden">4K</span>
+              </button>
+            )}
             <button
               onClick={() => handleDelete(previewItem.id)}
               disabled={deleting === previewItem.id}

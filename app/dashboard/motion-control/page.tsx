@@ -373,7 +373,7 @@ export default function MotionControlPage() {
                       try {
                         await fetch("/api/gallery/save", {
                           method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ url: generatedVideo.url, type: "video", prompt: customPrompt, model: MODEL_ID, aspectRatio: "auto", sourceAction: "motion-control" }),
+                          body: JSON.stringify({ url: generatedVideo.url, type: "video", prompt: customPrompt, model: MODEL_ID, aspectRatio: "auto", sourceAction: "motion-control", mediaGenerationId: generatedVideo.assetId }),
                         })
                         setSaved(true)
                       } catch { /* ignore */ } finally { setSaving(false) }

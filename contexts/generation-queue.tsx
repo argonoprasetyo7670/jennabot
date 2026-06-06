@@ -558,8 +558,8 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
             prompt: job.prompt || "",
             model: job.model || "",
             aspectRatio: (vid as { aspectRatio?: string }).aspectRatio || "",
-            mediaGenerationId: vid.mediaGenerationId || "",
-            sourceAction: "video-generator",
+            mediaGenerationId: (vid as any).mediaGenerationId || (vid as any).assetId || "",
+            sourceAction: job.model?.includes("Seedance") ? "seedance-2" : job.model?.includes("Motion Control") ? "motion-control" : "video-generator",
           }),
         }).catch(() => {})
       }
