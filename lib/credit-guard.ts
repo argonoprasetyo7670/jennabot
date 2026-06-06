@@ -74,6 +74,9 @@ export async function deductCredits(
     )
 
     return { ok: true as const, balance: newBalance }
+  }, {
+    maxWait: 15000,
+    timeout: 30000,
   })
 }
 

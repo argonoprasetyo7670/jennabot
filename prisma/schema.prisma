@@ -314,6 +314,8 @@ model transactions {
   fraudStatus      String?
   midtransResponse String?
   resellerId       String?
+  promoCode        String?
+  discountAmount   Int      @default(0)
   users            users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt(sort: Desc)])
@@ -426,4 +428,20 @@ model verification_tokens {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model promo_codes {
+  id              String    @id
+  code            String    @unique
+  discountType    String    @default("percent") // "percent" atau "nominal"
+  discountValue   Int
+  maxUses         Int?
+  currentUses     Int       @default(0)
+  expiresAt       DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+
+  @@index([code])
+  @@index([isActive])
 }

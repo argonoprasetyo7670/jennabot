@@ -203,26 +203,77 @@ function submitJobToStore(
         }
       }
 
-      updateJobInStore(id, { status: "generating", progress: "Membuat gambar..." })
+      updateJobInStore(id, { status: "generating", progress: "Mengirim ke server..." })
 
-      const result = await generateImages({
-        ...params,
-        references: refs.length > 0 ? refs : undefined,
-        email: refs.length > 0 ? email : undefined,
+      const body: Record<string, unknown> = {
+        prompt: params.prompt,
+        model: params.model || "nano-banana-pro",
+        aspectRatio: params.aspectRatio || "9:16",
+        count: params.count || 1,
+        async: true,
+      }
+      if (params.seed !== undefined) body.seed = params.seed
+      if (email) body.email = email
+      if (refs.length > 0) body.references = refs
+
+      const startRes = await fetch("/api/ai/image-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       })
+      const startData = await startRes.json()
+      
+      if (!startRes.ok) {
+        throw new Error(
+          typeof startData.error === "string" ? startData.error : `Gagal memulai (${startRes.status})`
+        )
+      }
 
-      // Credits are deducted server-side. Just update UI balance.
-      const imageCount = result.images.length || 1
-      const creditCost = imageCount * CREDIT_COST_IMAGE
-      window.dispatchEvent(new CustomEvent("credits-updated"))
+      const useapiJobId = startData.jobId as string
+      if (!useapiJobId) throw new Error("Server tidak mengembalikan jobId")
 
+      // ── Persist serverJobId immediately so resume-on-refresh works ──
       updateJobInStore(id, {
-        status: "done",
-        progress: undefined,
-        images: result.images,
-        creditsDeducted: creditCost,
-        completedAt: new Date(),
+        serverJobId: useapiJobId,
+        progress: "Membuat gambar... (10-60 detik)",
       })
+
+      // ── Poll until done ──
+      const POLL_INTERVAL = 5000
+      const MAX_POLLS = 24 // 2 minutes max for images
+
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+        const pollRes = await fetch(`/api/ai/image-generate?jobId=${encodeURIComponent(useapiJobId)}`)
+        const pollData = await pollRes.json()
+
+        if (pollData.status === "processing") {
+          updateJobInStore(id, { progress: `Membuat gambar... (${(i + 1) * 5}s)` })
+          continue
+        }
+
+        if (pollData.status === "error") {
+          throw new Error(pollData.error || "Image generation failed")
+        }
+
+        if (pollData.status === "done") {
+          const images = pollData.images || []
+          if (images.length === 0) throw new Error("Tidak ada gambar yang dihasilkan")
+
+          window.dispatchEvent(new CustomEvent("credits-updated"))
+          updateJobInStore(id, {
+            status: "done",
+            progress: undefined,
+            images,
+            creditsDeducted: (body.count as number) * CREDIT_COST_IMAGE,
+            completedAt: new Date(),
+          })
+          return
+        }
+      }
+
+      throw new Error("Timeout: image generation melebihi 2 menit")
     } catch (err) {
       updateJobInStore(id, {
         status: "error",
@@ -515,15 +566,14 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
     }
   }, [jobs])
 
-  // Resume polling for video jobs interrupted by page refresh/close
+  // Resume polling for jobs interrupted by page refresh/close
   React.useEffect(() => {
     const store = getStore()
-    const processingVideoJobs = store.jobs.filter(
-      (j) => j.type === "video" && (j.status === "uploading" || j.status === "generating")
+    const processingJobs = store.jobs.filter(
+      (j) => (j.type === "video" || j.type === "image") && (j.status === "uploading" || j.status === "generating")
     )
 
-    for (const job of processingVideoJobs) {
-      // Jobs stuck in "uploading" had no serverJobId yet — can't resume upload (File objects gone)
+    for (const job of processingJobs) {
       if (!job.serverJobId) {
         updateJobInStore(job.id, {
           status: "error",
@@ -534,81 +584,129 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
         continue
       }
 
-      // Jobs in "generating" with a serverJobId — resume polling against UseAPI
       const localId = job.id
       const serverJobId = job.serverJobId
-      console.log(`[queue] Resuming poll for local=${localId} server=${serverJobId}`)
+      console.log(`[queue] Resuming poll for local=${localId} server=${serverJobId} type=${job.type}`)
       updateJobInStore(localId, { progress: "Melanjutkan setelah refresh..." })
 
-      ;(async () => {
-        const POLL_INTERVAL = 5000
-        const MAX_POLLS = 60 // 5 minutes
+      if (job.type === "video") {
+        ;(async () => {
+          const POLL_INTERVAL = 5000
+          const MAX_POLLS = 60 // 5 minutes
 
-        for (let i = 0; i < MAX_POLLS; i++) {
-          await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+          for (let i = 0; i < MAX_POLLS; i++) {
+            await new Promise((r) => setTimeout(r, POLL_INTERVAL))
 
-          try {
-            const res = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(serverJobId)}`)
-            const data = await res.json()
+            try {
+              const res = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(serverJobId)}`)
+              const data = await res.json()
 
-            if (data.status === "processing") {
-              updateJobInStore(localId, { progress: `Masih membuat video... (${(i + 1) * 5}s)` })
-              continue
-            }
+              if (data.status === "processing") {
+                updateJobInStore(localId, { progress: `Masih membuat video... (${(i + 1) * 5}s)` })
+                continue
+              }
 
-            if (data.status === "error") {
-              updateJobInStore(localId, {
-                status: "error", progress: undefined,
-                error: data.error || "Generation failed",
-                completedAt: new Date(),
-              })
-              return
-            }
-
-            if (data.status === "done") {
-              const videos = (data.media || [])
-                .map((m: Record<string, unknown>) => {
-                  const videoUrl = m.videoUrl as string | undefined
-                  if (!videoUrl) return null
-                  const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
-                  const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
-                  return {
-                    url: proxyUrl,
-                    rawUrl: videoUrl,
-                    thumbnailUrl: m.thumbnailUrl as string | undefined,
-                    seed: gen?.seed as number | undefined,
-                    mediaGenerationId: m.mediaGenerationId as string | undefined,
-                    model: gen?.model as string | undefined,
-                    aspectRatio: gen?.aspectRatio as string | undefined,
-                  }
+              if (data.status === "error") {
+                updateJobInStore(localId, {
+                  status: "error", progress: undefined,
+                  error: data.error || "Generation failed",
+                  completedAt: new Date(),
                 })
-                .filter(Boolean)
+                return
+              }
 
-              updateJobInStore(localId, {
-                status: "done", progress: undefined,
-                videos,
-                creditsDeducted: data.creditsDeducted || 0,
-                completedAt: new Date(),
-              })
-              window.dispatchEvent(new CustomEvent("credits-updated"))
-              return
-            }
-          } catch {
-            if (i >= MAX_POLLS - 1) {
-              updateJobInStore(localId, {
-                status: "error", progress: undefined,
-                error: "Polling timed out setelah refresh",
-                completedAt: new Date(),
-              })
+              if (data.status === "done") {
+                const videos = (data.media || [])
+                  .map((m: Record<string, unknown>) => {
+                    const videoUrl = m.videoUrl as string | undefined
+                    if (!videoUrl) return null
+                    const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
+                    const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
+                    return {
+                      url: proxyUrl,
+                      rawUrl: videoUrl,
+                      thumbnailUrl: m.thumbnailUrl as string | undefined,
+                      seed: gen?.seed as number | undefined,
+                      mediaGenerationId: m.mediaGenerationId as string | undefined,
+                      model: gen?.model as string | undefined,
+                      aspectRatio: gen?.aspectRatio as string | undefined,
+                    }
+                  })
+                  .filter(Boolean)
+
+                updateJobInStore(localId, {
+                  status: "done", progress: undefined,
+                  videos,
+                  creditsDeducted: data.creditsDeducted || 0,
+                  completedAt: new Date(),
+                })
+                window.dispatchEvent(new CustomEvent("credits-updated"))
+                return
+              }
+            } catch {
+              if (i >= MAX_POLLS - 1) {
+                updateJobInStore(localId, {
+                  status: "error", progress: undefined,
+                  error: "Polling timed out setelah refresh",
+                  completedAt: new Date(),
+                })
+              }
             }
           }
-        }
-      })()
+        })()
+      } else if (job.type === "image") {
+        ;(async () => {
+          const POLL_INTERVAL = 5000
+          const MAX_POLLS = 24 // 2 minutes
+
+          for (let i = 0; i < MAX_POLLS; i++) {
+            await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+            try {
+              const res = await fetch(`/api/ai/image-generate?jobId=${encodeURIComponent(serverJobId)}`)
+              const data = await res.json()
+
+              if (data.status === "processing") {
+                updateJobInStore(localId, { progress: `Masih membuat gambar... (${(i + 1) * 5}s)` })
+                continue
+              }
+
+              if (data.status === "error") {
+                updateJobInStore(localId, {
+                  status: "error", progress: undefined,
+                  error: data.error || "Generation failed",
+                  completedAt: new Date(),
+                })
+                return
+              }
+
+              if (data.status === "done") {
+                updateJobInStore(localId, {
+                  status: "done", progress: undefined,
+                  images: data.images || [],
+                  creditsDeducted: data.creditsDeducted || 0,
+                  completedAt: new Date(),
+                })
+                window.dispatchEvent(new CustomEvent("credits-updated"))
+                return
+              }
+            } catch {
+              if (i >= MAX_POLLS - 1) {
+                updateJobInStore(localId, {
+                  status: "error", progress: undefined,
+                  error: "Polling timed out setelah refresh",
+                  completedAt: new Date(),
+                })
+              }
+            }
+          }
+        })()
+      }
     }
 
-    // Image & custom jobs that were mid-generation can't be resumed
+    // Other jobs that were mid-generation can't be resumed
     const nonResumable = store.jobs.filter(
-      (j) => j.type !== "video" && (j.status === "uploading" || j.status === "generating")
+      (j) => j.type !== "video" && j.type !== "image" && (j.status === "uploading" || j.status === "generating")
     )
     for (const job of nonResumable) {
       updateJobInStore(job.id, {

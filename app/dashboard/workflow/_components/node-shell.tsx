@@ -49,7 +49,7 @@ export function NodeShell({ label, icon, status, nodeType, nodeId, children }: {
 
   return (
     <div className={cn(
-      "workflow-node relative min-w-[280px] max-w-[340px] rounded-2xl border bg-card shadow-sm transition-all overflow-hidden",
+      "workflow-node relative min-w-[280px] max-w-[340px] rounded-2xl border bg-card shadow-sm transition-all",
       isRunning && "ring-2 ring-violet-400/60 shadow-violet-500/20 shadow-lg",
       status === "done" && "ring-1 ring-emerald-500/40",
       status === "error" && "ring-1 ring-red-500/40",

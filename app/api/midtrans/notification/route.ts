@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     // On successful payment → add credits
     if (newStatus === "success" && transaction.status !== "success") {
-      await addCreditsFromPurchase(transaction.userId, transaction.plan, transaction.orderId)
+      await addCreditsFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode)
     }
 
     return NextResponse.json({ status: "ok" })
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 /**
  * Parse credits from the plan name and add to user balance
  */
-async function addCreditsFromPurchase(userId: string, plan: string, orderId: string) {
+async function addCreditsFromPurchase(userId: string, plan: string, orderId: string, promoCode: string | null) {
   // Plan format: "Pro - 550 Credits"
   const creditsMatch = plan.match(/(\d+)\s*Credits/i)
   if (!creditsMatch) {
@@ -113,7 +113,7 @@ async function addCreditsFromPurchase(userId: string, plan: string, orderId: str
   const currentBalance = currentCredits?.balance ?? 0
   const newBalance = currentBalance + creditsToAdd
 
-  await prisma.$transaction([
+  const transactionOperations = [
     // Upsert user credits
     prisma.user_credits.upsert({
       where: { userId },
@@ -133,12 +133,24 @@ async function addCreditsFromPurchase(userId: string, plan: string, orderId: str
         type: "topup",
         amount: creditsToAdd,
         balance: newBalance,
-        description: `Pembelian ${plan}`,
+        description: `Pembelian ${plan}${promoCode ? ` (Promo: ${promoCode})` : ""}`,
         feature: "purchase",
         referenceId: orderId,
       },
     }),
-  ])
+  ]
+
+  // Jika transaksi memakai kode promo, tambahkan ke counter promo_codes
+  if (promoCode) {
+    transactionOperations.push(
+      prisma.promo_codes.update({
+        where: { code: promoCode },
+        data: { currentUses: { increment: 1 } },
+      }) as any
+    )
+  }
+
+  await prisma.$transaction(transactionOperations)
 
   console.log(
     `[credits] Added ${creditsToAdd} credits for user ${userId}. Balance: ${currentBalance} → ${newBalance}`

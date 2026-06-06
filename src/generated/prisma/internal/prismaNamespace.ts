@@ -406,7 +406,8 @@ export const ModelName = {
   user_assets: 'user_assets',
   user_credits: 'user_credits',
   users: 'users',
-  verification_tokens: 'verification_tokens'
+  verification_tokens: 'verification_tokens',
+  promo_codes: 'promo_codes'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -422,7 +423,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "accounts" | "api_keys" | "api_usage" | "credit_costs" | "credit_packages" | "credit_transactions" | "gallery_items" | "referrals" | "reseller_credit_packages" | "reseller_transactions" | "reseller_withdrawals" | "resellers" | "sessions" | "settings" | "subscription_plans" | "subscriptions" | "transactions" | "upscale_items" | "usage_stats" | "user_assets" | "user_credits" | "users" | "verification_tokens"
+    modelProps: "accounts" | "api_keys" | "api_usage" | "credit_costs" | "credit_packages" | "credit_transactions" | "gallery_items" | "referrals" | "reseller_credit_packages" | "reseller_transactions" | "reseller_withdrawals" | "resellers" | "sessions" | "settings" | "subscription_plans" | "subscriptions" | "transactions" | "upscale_items" | "usage_stats" | "user_assets" | "user_credits" | "users" | "verification_tokens" | "promo_codes"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2128,6 +2129,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    promo_codes: {
+      payload: Prisma.$promo_codesPayload<ExtArgs>
+      fields: Prisma.promo_codesFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.promo_codesFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.promo_codesFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>
+        }
+        findFirst: {
+          args: Prisma.promo_codesFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.promo_codesFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>
+        }
+        findMany: {
+          args: Prisma.promo_codesFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>[]
+        }
+        create: {
+          args: Prisma.promo_codesCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>
+        }
+        createMany: {
+          args: Prisma.promo_codesCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.promo_codesCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>[]
+        }
+        delete: {
+          args: Prisma.promo_codesDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>
+        }
+        update: {
+          args: Prisma.promo_codesUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>
+        }
+        deleteMany: {
+          args: Prisma.promo_codesDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.promo_codesUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.promo_codesUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>[]
+        }
+        upsert: {
+          args: Prisma.promo_codesUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$promo_codesPayload>
+        }
+        aggregate: {
+          args: Prisma.Promo_codesAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePromo_codes>
+        }
+        groupBy: {
+          args: Prisma.promo_codesGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.Promo_codesGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.promo_codesCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.Promo_codesCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2460,7 +2535,9 @@ export const TransactionsScalarFieldEnum = {
   updatedAt: 'updatedAt',
   fraudStatus: 'fraudStatus',
   midtransResponse: 'midtransResponse',
-  resellerId: 'resellerId'
+  resellerId: 'resellerId',
+  promoCode: 'promoCode',
+  discountAmount: 'discountAmount'
 } as const
 
 export type TransactionsScalarFieldEnum = (typeof TransactionsScalarFieldEnum)[keyof typeof TransactionsScalarFieldEnum]
@@ -2554,6 +2631,22 @@ export const Verification_tokensScalarFieldEnum = {
 } as const
 
 export type Verification_tokensScalarFieldEnum = (typeof Verification_tokensScalarFieldEnum)[keyof typeof Verification_tokensScalarFieldEnum]
+
+
+export const Promo_codesScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  discountType: 'discountType',
+  discountValue: 'discountValue',
+  maxUses: 'maxUses',
+  currentUses: 'currentUses',
+  expiresAt: 'expiresAt',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type Promo_codesScalarFieldEnum = (typeof Promo_codesScalarFieldEnum)[keyof typeof Promo_codesScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2781,6 +2874,7 @@ export type GlobalOmitConfig = {
   user_credits?: Prisma.user_creditsOmit
   users?: Prisma.usersOmit
   verification_tokens?: Prisma.verification_tokensOmit
+  promo_codes?: Prisma.promo_codesOmit
 }
 
 /* Types for Logging */

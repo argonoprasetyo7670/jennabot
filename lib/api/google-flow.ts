@@ -113,50 +113,67 @@ export async function generateImages(params: GenerateImageParams): Promise<Gener
     count: params.count || 1,
     seed: params.seed,
     references: params.references,
+    async: true,
   }
 
   if (params.email) {
     body.email = params.email
   }
 
-  const res = await fetch("/api/ai/image-generate", {
+  const startRes = await fetch("/api/ai/image-generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
 
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(typeof data.error === "string" ? data.error : data.error?.message || `Generation failed (${res.status})`)
+  const startData = await startRes.json()
+  if (!startRes.ok) {
+    throw new Error(typeof startData.error === "string" ? startData.error : startData.error?.message || `Generation failed (${startRes.status})`)
   }
 
-  const images: GeneratedImage[] = (data.media || [])
-    .map((m: Record<string, unknown>) => {
-      const gen = (m.image as Record<string, unknown>)?.generatedImage as Record<string, unknown> | undefined
-      if (!gen?.fifeUrl) return null
+  const jobId = startData.jobId
+  if (!jobId) {
+    throw new Error("No jobId returned from server")
+  }
 
-      // mediaGenerationId can be a nested object { mediaGenerationId: "..." } or a plain string
-      const rawMgId = gen.mediaGenerationId
-      const resolvedMediaId: string | undefined =
-        rawMgId && typeof rawMgId === "object"
-          ? ((rawMgId as Record<string, unknown>).mediaGenerationId as string | undefined)
-          : (rawMgId as string | undefined)
+  console.log(`[image] Job started: ${jobId}`)
 
-      return {
-        url: gen.fifeUrl as string,
-        seed: gen.seed as number | undefined,
-        mediaGenerationId: resolvedMediaId,
-        aspectRatio: gen.aspectRatio as string | undefined,
-        modelNameType: gen.modelNameType as string | undefined,
+  // Poll for results every 5 seconds (max 2 minutes)
+  const POLL_INTERVAL = 5000
+  const MAX_POLLS = 24
+
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+    try {
+      const pollRes = await fetch(`/api/ai/image-generate?jobId=${encodeURIComponent(jobId)}`)
+      const pollData = await pollRes.json()
+
+      if (pollData.status === "processing") {
+        console.log(`[image] Job ${jobId}: still processing... (${(i + 1) * 5}s)`)
+        continue
       }
-    })
-    .filter(Boolean) as GeneratedImage[]
 
-  if (images.length === 0) {
-    throw new Error("No images were generated. Try a different prompt.")
+      if (pollData.status === "error") {
+        throw new Error(pollData.error || "Image generation failed")
+      }
+
+      if (pollData.status === "done") {
+        console.log(`[image] Job ${jobId}: done!`)
+        const images = pollData.images || []
+        
+        if (images.length === 0) {
+          throw new Error("No images were generated. Try a different prompt.")
+        }
+
+        return { jobId, images }
+      }
+    } catch (err) {
+      if (i >= MAX_POLLS - 1) throw err
+    }
   }
 
-  return { jobId: data.jobId || "", images }
+  throw new Error("Image generation timed out after 2 minutes.")
 }
 
 export interface UpscaleResult {

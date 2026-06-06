@@ -136,3 +136,70 @@ export async function cleanupVideoJob(jobId: string, includeResult = false): Pro
     keys.map(key => prisma.settings.delete({ where: { key } }).catch(() => {}))
   )
 }
+
+/* ─── IMAGE JOB STORAGE ─── */
+
+export const IMAGE_JOB_RESULT_PREFIX = "ij:"
+export const IMAGE_JOB_META_PREFIX = "ijmeta:"
+
+export interface ImageJobMeta {
+  userId: string
+  creditCost: number
+  feature: string
+}
+
+export interface ImageJobResult {
+  media: Record<string, unknown>[]
+  timestamp: number
+  status: "done" | "error"
+  error?: string
+}
+
+export async function storeImageJobMeta(jobId: string, meta: ImageJobMeta): Promise<void> {
+  const key = `${IMAGE_JOB_META_PREFIX}${jobId}`
+  await prisma.settings.upsert({
+    where: { key },
+    update: { value: JSON.stringify(meta), updatedAt: new Date() },
+    create: { id: crypto.randomUUID(), key, value: JSON.stringify(meta), updatedAt: new Date() },
+  }).catch(err => console.error("[credits] storeImageJobMeta error:", err))
+}
+
+export async function getImageJobMeta(jobId: string): Promise<ImageJobMeta | null> {
+  const key = `${IMAGE_JOB_META_PREFIX}${jobId}`
+  try {
+    const entry = await prisma.settings.findUnique({ where: { key } })
+    if (!entry) return null
+    return JSON.parse(entry.value) as ImageJobMeta
+  } catch { return null }
+}
+
+export async function storeImageJobResult(jobId: string, result: ImageJobResult): Promise<void> {
+  const key = `${IMAGE_JOB_RESULT_PREFIX}${jobId}`
+  await prisma.settings.upsert({
+    where: { key },
+    update: { value: JSON.stringify(result), updatedAt: new Date() },
+    create: { id: crypto.randomUUID(), key, value: JSON.stringify(result), updatedAt: new Date() },
+  }).catch(err => console.error("[credits] storeImageJobResult error:", err))
+}
+
+export async function getImageJobResult(jobId: string): Promise<ImageJobResult | null> {
+  const key = `${IMAGE_JOB_RESULT_PREFIX}${jobId}`
+  try {
+    const entry = await prisma.settings.findUnique({ where: { key } })
+    if (!entry) return null
+    const result = JSON.parse(entry.value) as ImageJobResult
+    if (Date.now() - result.timestamp > VIDEO_JOB_CACHE_TTL_MS) {
+      await prisma.settings.delete({ where: { key } }).catch(() => {})
+      return null
+    }
+    return result
+  } catch { return null }
+}
+
+export async function cleanupImageJob(jobId: string, includeResult = false): Promise<void> {
+  const keys = [`${IMAGE_JOB_META_PREFIX}${jobId}`]
+  if (includeResult) keys.push(`${IMAGE_JOB_RESULT_PREFIX}${jobId}`)
+  await Promise.all(
+    keys.map(key => prisma.settings.delete({ where: { key } }).catch(() => {}))
+  )
+}

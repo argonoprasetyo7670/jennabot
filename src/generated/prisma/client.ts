@@ -156,3 +156,8 @@ export type users = Prisma.usersModel
  * 
  */
 export type verification_tokens = Prisma.verification_tokensModel
+/**
+ * Model promo_codes
+ * 
+ */
+export type promo_codes = Prisma.promo_codesModel

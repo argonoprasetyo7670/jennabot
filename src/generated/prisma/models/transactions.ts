@@ -28,10 +28,12 @@ export type AggregateTransactions = {
 
 export type TransactionsAvgAggregateOutputType = {
   amount: number | null
+  discountAmount: number | null
 }
 
 export type TransactionsSumAggregateOutputType = {
   amount: number | null
+  discountAmount: number | null
 }
 
 export type TransactionsMinAggregateOutputType = {
@@ -49,6 +51,8 @@ export type TransactionsMinAggregateOutputType = {
   fraudStatus: string | null
   midtransResponse: string | null
   resellerId: string | null
+  promoCode: string | null
+  discountAmount: number | null
 }
 
 export type TransactionsMaxAggregateOutputType = {
@@ -66,6 +70,8 @@ export type TransactionsMaxAggregateOutputType = {
   fraudStatus: string | null
   midtransResponse: string | null
   resellerId: string | null
+  promoCode: string | null
+  discountAmount: number | null
 }
 
 export type TransactionsCountAggregateOutputType = {
@@ -83,16 +89,20 @@ export type TransactionsCountAggregateOutputType = {
   fraudStatus: number
   midtransResponse: number
   resellerId: number
+  promoCode: number
+  discountAmount: number
   _all: number
 }
 
 
 export type TransactionsAvgAggregateInputType = {
   amount?: true
+  discountAmount?: true
 }
 
 export type TransactionsSumAggregateInputType = {
   amount?: true
+  discountAmount?: true
 }
 
 export type TransactionsMinAggregateInputType = {
@@ -110,6 +120,8 @@ export type TransactionsMinAggregateInputType = {
   fraudStatus?: true
   midtransResponse?: true
   resellerId?: true
+  promoCode?: true
+  discountAmount?: true
 }
 
 export type TransactionsMaxAggregateInputType = {
@@ -127,6 +139,8 @@ export type TransactionsMaxAggregateInputType = {
   fraudStatus?: true
   midtransResponse?: true
   resellerId?: true
+  promoCode?: true
+  discountAmount?: true
 }
 
 export type TransactionsCountAggregateInputType = {
@@ -144,6 +158,8 @@ export type TransactionsCountAggregateInputType = {
   fraudStatus?: true
   midtransResponse?: true
   resellerId?: true
+  promoCode?: true
+  discountAmount?: true
   _all?: true
 }
 
@@ -248,6 +264,8 @@ export type TransactionsGroupByOutputType = {
   fraudStatus: string | null
   midtransResponse: string | null
   resellerId: string | null
+  promoCode: string | null
+  discountAmount: number
   _count: TransactionsCountAggregateOutputType | null
   _avg: TransactionsAvgAggregateOutputType | null
   _sum: TransactionsSumAggregateOutputType | null
@@ -288,6 +306,8 @@ export type transactionsWhereInput = {
   fraudStatus?: Prisma.StringNullableFilter<"transactions"> | string | null
   midtransResponse?: Prisma.StringNullableFilter<"transactions"> | string | null
   resellerId?: Prisma.StringNullableFilter<"transactions"> | string | null
+  promoCode?: Prisma.StringNullableFilter<"transactions"> | string | null
+  discountAmount?: Prisma.IntFilter<"transactions"> | number
   users?: Prisma.XOR<Prisma.UsersScalarRelationFilter, Prisma.usersWhereInput>
 }
 
@@ -306,6 +326,8 @@ export type transactionsOrderByWithRelationInput = {
   fraudStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   midtransResponse?: Prisma.SortOrderInput | Prisma.SortOrder
   resellerId?: Prisma.SortOrderInput | Prisma.SortOrder
+  promoCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
   users?: Prisma.usersOrderByWithRelationInput
 }
 
@@ -327,6 +349,8 @@ export type transactionsWhereUniqueInput = Prisma.AtLeast<{
   fraudStatus?: Prisma.StringNullableFilter<"transactions"> | string | null
   midtransResponse?: Prisma.StringNullableFilter<"transactions"> | string | null
   resellerId?: Prisma.StringNullableFilter<"transactions"> | string | null
+  promoCode?: Prisma.StringNullableFilter<"transactions"> | string | null
+  discountAmount?: Prisma.IntFilter<"transactions"> | number
   users?: Prisma.XOR<Prisma.UsersScalarRelationFilter, Prisma.usersWhereInput>
 }, "id" | "orderId">
 
@@ -345,6 +369,8 @@ export type transactionsOrderByWithAggregationInput = {
   fraudStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   midtransResponse?: Prisma.SortOrderInput | Prisma.SortOrder
   resellerId?: Prisma.SortOrderInput | Prisma.SortOrder
+  promoCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
   _count?: Prisma.transactionsCountOrderByAggregateInput
   _avg?: Prisma.transactionsAvgOrderByAggregateInput
   _max?: Prisma.transactionsMaxOrderByAggregateInput
@@ -370,6 +396,8 @@ export type transactionsScalarWhereWithAggregatesInput = {
   fraudStatus?: Prisma.StringNullableWithAggregatesFilter<"transactions"> | string | null
   midtransResponse?: Prisma.StringNullableWithAggregatesFilter<"transactions"> | string | null
   resellerId?: Prisma.StringNullableWithAggregatesFilter<"transactions"> | string | null
+  promoCode?: Prisma.StringNullableWithAggregatesFilter<"transactions"> | string | null
+  discountAmount?: Prisma.IntWithAggregatesFilter<"transactions"> | number
 }
 
 export type transactionsCreateInput = {
@@ -386,6 +414,8 @@ export type transactionsCreateInput = {
   fraudStatus?: string | null
   midtransResponse?: string | null
   resellerId?: string | null
+  promoCode?: string | null
+  discountAmount?: number
   users: Prisma.usersCreateNestedOneWithoutTransactionsInput
 }
 
@@ -404,6 +434,8 @@ export type transactionsUncheckedCreateInput = {
   fraudStatus?: string | null
   midtransResponse?: string | null
   resellerId?: string | null
+  promoCode?: string | null
+  discountAmount?: number
 }
 
 export type transactionsUpdateInput = {
@@ -420,6 +452,8 @@ export type transactionsUpdateInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
   users?: Prisma.usersUpdateOneRequiredWithoutTransactionsNestedInput
 }
 
@@ -438,6 +472,8 @@ export type transactionsUncheckedUpdateInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type transactionsCreateManyInput = {
@@ -455,6 +491,8 @@ export type transactionsCreateManyInput = {
   fraudStatus?: string | null
   midtransResponse?: string | null
   resellerId?: string | null
+  promoCode?: string | null
+  discountAmount?: number
 }
 
 export type transactionsUpdateManyMutationInput = {
@@ -471,6 +509,8 @@ export type transactionsUpdateManyMutationInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type transactionsUncheckedUpdateManyInput = {
@@ -488,6 +528,8 @@ export type transactionsUncheckedUpdateManyInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type transactionsCountOrderByAggregateInput = {
@@ -505,10 +547,13 @@ export type transactionsCountOrderByAggregateInput = {
   fraudStatus?: Prisma.SortOrder
   midtransResponse?: Prisma.SortOrder
   resellerId?: Prisma.SortOrder
+  promoCode?: Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
 }
 
 export type transactionsAvgOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
 }
 
 export type transactionsMaxOrderByAggregateInput = {
@@ -526,6 +571,8 @@ export type transactionsMaxOrderByAggregateInput = {
   fraudStatus?: Prisma.SortOrder
   midtransResponse?: Prisma.SortOrder
   resellerId?: Prisma.SortOrder
+  promoCode?: Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
 }
 
 export type transactionsMinOrderByAggregateInput = {
@@ -543,10 +590,13 @@ export type transactionsMinOrderByAggregateInput = {
   fraudStatus?: Prisma.SortOrder
   midtransResponse?: Prisma.SortOrder
   resellerId?: Prisma.SortOrder
+  promoCode?: Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
 }
 
 export type transactionsSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+  discountAmount?: Prisma.SortOrder
 }
 
 export type TransactionsListRelationFilter = {
@@ -615,6 +665,8 @@ export type transactionsCreateWithoutUsersInput = {
   fraudStatus?: string | null
   midtransResponse?: string | null
   resellerId?: string | null
+  promoCode?: string | null
+  discountAmount?: number
 }
 
 export type transactionsUncheckedCreateWithoutUsersInput = {
@@ -631,6 +683,8 @@ export type transactionsUncheckedCreateWithoutUsersInput = {
   fraudStatus?: string | null
   midtransResponse?: string | null
   resellerId?: string | null
+  promoCode?: string | null
+  discountAmount?: number
 }
 
 export type transactionsCreateOrConnectWithoutUsersInput = {
@@ -677,6 +731,8 @@ export type transactionsScalarWhereInput = {
   fraudStatus?: Prisma.StringNullableFilter<"transactions"> | string | null
   midtransResponse?: Prisma.StringNullableFilter<"transactions"> | string | null
   resellerId?: Prisma.StringNullableFilter<"transactions"> | string | null
+  promoCode?: Prisma.StringNullableFilter<"transactions"> | string | null
+  discountAmount?: Prisma.IntFilter<"transactions"> | number
 }
 
 export type transactionsCreateManyUsersInput = {
@@ -693,6 +749,8 @@ export type transactionsCreateManyUsersInput = {
   fraudStatus?: string | null
   midtransResponse?: string | null
   resellerId?: string | null
+  promoCode?: string | null
+  discountAmount?: number
 }
 
 export type transactionsUpdateWithoutUsersInput = {
@@ -709,6 +767,8 @@ export type transactionsUpdateWithoutUsersInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type transactionsUncheckedUpdateWithoutUsersInput = {
@@ -725,6 +785,8 @@ export type transactionsUncheckedUpdateWithoutUsersInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 export type transactionsUncheckedUpdateManyWithoutUsersInput = {
@@ -741,6 +803,8 @@ export type transactionsUncheckedUpdateManyWithoutUsersInput = {
   fraudStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   midtransResponse?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  promoCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  discountAmount?: Prisma.IntFieldUpdateOperationsInput | number
 }
 
 
@@ -760,6 +824,8 @@ export type transactionsSelect<ExtArgs extends runtime.Types.Extensions.Internal
   fraudStatus?: boolean
   midtransResponse?: boolean
   resellerId?: boolean
+  promoCode?: boolean
+  discountAmount?: boolean
   users?: boolean | Prisma.usersDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["transactions"]>
 
@@ -778,6 +844,8 @@ export type transactionsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   fraudStatus?: boolean
   midtransResponse?: boolean
   resellerId?: boolean
+  promoCode?: boolean
+  discountAmount?: boolean
   users?: boolean | Prisma.usersDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["transactions"]>
 
@@ -796,6 +864,8 @@ export type transactionsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   fraudStatus?: boolean
   midtransResponse?: boolean
   resellerId?: boolean
+  promoCode?: boolean
+  discountAmount?: boolean
   users?: boolean | Prisma.usersDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["transactions"]>
 
@@ -814,9 +884,11 @@ export type transactionsSelectScalar = {
   fraudStatus?: boolean
   midtransResponse?: boolean
   resellerId?: boolean
+  promoCode?: boolean
+  discountAmount?: boolean
 }
 
-export type transactionsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "orderId" | "plan" | "amount" | "status" | "paymentType" | "transactionId" | "midtransToken" | "createdAt" | "updatedAt" | "fraudStatus" | "midtransResponse" | "resellerId", ExtArgs["result"]["transactions"]>
+export type transactionsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "orderId" | "plan" | "amount" | "status" | "paymentType" | "transactionId" | "midtransToken" | "createdAt" | "updatedAt" | "fraudStatus" | "midtransResponse" | "resellerId" | "promoCode" | "discountAmount", ExtArgs["result"]["transactions"]>
 export type transactionsInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   users?: boolean | Prisma.usersDefaultArgs<ExtArgs>
 }
@@ -847,6 +919,8 @@ export type $transactionsPayload<ExtArgs extends runtime.Types.Extensions.Intern
     fraudStatus: string | null
     midtransResponse: string | null
     resellerId: string | null
+    promoCode: string | null
+    discountAmount: number
   }, ExtArgs["result"]["transactions"]>
   composites: {}
 }
@@ -1285,6 +1359,8 @@ export interface transactionsFieldRefs {
   readonly fraudStatus: Prisma.FieldRef<"transactions", 'String'>
   readonly midtransResponse: Prisma.FieldRef<"transactions", 'String'>
   readonly resellerId: Prisma.FieldRef<"transactions", 'String'>
+  readonly promoCode: Prisma.FieldRef<"transactions", 'String'>
+  readonly discountAmount: Prisma.FieldRef<"transactions", 'Int'>
 }
     
 

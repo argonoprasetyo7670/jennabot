@@ -111,6 +111,11 @@ export default function BuyCreditsPage() {
   const [snapReady, setSnapReady] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
 
+  // Promo code states
+  const [promoInput, setPromoInput] = useState("")
+  const [validatingPromo, setValidatingPromo] = useState(false)
+  const [activePromo, setActivePromo] = useState<{ code: string; type: string; value: number } | null>(null)
+
   const { balance, refresh: refreshCredits } = useCredits()
 
   const fetchPackages = useCallback(async () => {
@@ -137,6 +142,47 @@ export default function BuyCreditsPage() {
 
   const showToast = (message: string, type: "success" | "error" | "info") => setToast({ message, type })
 
+  const handleValidatePromo = async () => {
+    if (!promoInput.trim()) return
+    setValidatingPromo(true)
+    try {
+      const res = await fetch(`/api/credits/promo-validate?code=${encodeURIComponent(promoInput)}`)
+      const data = await res.json()
+      if (res.ok && data.isValid) {
+        setActivePromo({
+          code: data.code,
+          type: data.discountType,
+          value: data.discountValue
+        })
+        showToast(data.message, "success")
+      } else {
+        setActivePromo(null)
+        showToast(data.message || data.error || "Kode promo tidak valid", "error")
+      }
+    } catch {
+      setActivePromo(null)
+      showToast("Gagal memvalidasi kode promo", "error")
+    } finally {
+      setValidatingPromo(false)
+    }
+  }
+
+  const clearPromo = () => {
+    setPromoInput("")
+    setActivePromo(null)
+  }
+
+  const calculateDiscountedPrice = (price: number) => {
+    if (!activePromo) return price
+    let discount = 0
+    if (activePromo.type === "percent") {
+      discount = Math.floor((price * activePromo.value) / 100)
+    } else if (activePromo.type === "nominal") {
+      discount = activePromo.value
+    }
+    return Math.max(0, price - discount)
+  }
+
   const handlePurchase = async (pkg: CreditPackage) => {
     if (purchasing) return
     if (!snapReady || !window.snap) {
@@ -149,7 +195,10 @@ export default function BuyCreditsPage() {
       const res = await fetch("/api/credits/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: pkg.id }),
+        body: JSON.stringify({ 
+          packageId: pkg.id,
+          promoCode: activePromo ? activePromo.code : undefined
+        }),
       })
 
       if (!res.ok) {
@@ -163,6 +212,7 @@ export default function BuyCreditsPage() {
         onSuccess: () => {
           showToast(`Pembayaran berhasil! ${pkg.credits + pkg.bonusCredits} credits ditambahkan.`, "success")
           refreshCredits()
+          if (activePromo) clearPromo()
         },
         onPending: () => showToast("Menunggu pembayaran...", "info"),
         onError: () => showToast("Pembayaran gagal. Silakan coba lagi.", "error"),
@@ -260,6 +310,42 @@ export default function BuyCreditsPage() {
             </div>
           </div>
 
+          {/* ── Promo Code Input ── */}
+          <div className="mb-8 mx-auto max-w-xl">
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/60 p-2 backdrop-blur-sm shadow-sm transition-all focus-within:border-violet-500/50 focus-within:ring-2 focus-within:ring-violet-500/20">
+              <GiftIcon className="ml-3 h-5 w-5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Punya Kode Promo?"
+                value={promoInput}
+                onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                disabled={activePromo !== null || validatingPromo}
+                className="flex-1 bg-transparent px-2 py-2 text-sm font-bold uppercase tracking-wider text-foreground outline-none placeholder:font-normal placeholder:normal-case placeholder:text-muted-foreground disabled:opacity-50"
+              />
+              {activePromo ? (
+                <button
+                  onClick={clearPromo}
+                  className="rounded-xl bg-red-500/10 px-4 py-2 text-xs font-bold text-red-500 transition-colors hover:bg-red-500/20"
+                >
+                  Batal
+                </button>
+              ) : (
+                <button
+                  onClick={handleValidatePromo}
+                  disabled={!promoInput.trim() || validatingPromo}
+                  className="flex min-w-24 items-center justify-center rounded-xl bg-violet-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-violet-600 disabled:opacity-50"
+                >
+                  {validatingPromo ? <Loader2Icon className="h-4 w-4 animate-spin" /> : "Terapkan"}
+                </button>
+              )}
+            </div>
+            {activePromo && (
+              <p className="mt-2 text-center text-sm font-medium text-green-500 animate-fade-up">
+                ✓ Promo <strong>{activePromo.code}</strong> aktif! Diskon {activePromo.type === "percent" ? `${activePromo.value}%` : formatPrice(activePromo.value)} telah diterapkan.
+              </p>
+            )}
+          </div>
+
           {/* ── Packages ── */}
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -316,7 +402,23 @@ export default function BuyCreditsPage() {
 
                     {/* Price */}
                     <div className="flex flex-col items-center border-t border-border/50 px-5 py-4">
-                      <span className="text-3xl font-black tracking-tight text-foreground">{formatPrice(pkg.price)}</span>
+                      {activePromo ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-muted-foreground line-through decoration-red-500/50">
+                              {formatPrice(pkg.price)}
+                            </span>
+                            <span className="text-xs font-bold text-green-500">
+                              -{activePromo.type === "percent" ? `${activePromo.value}%` : formatPrice(activePromo.value)}
+                            </span>
+                          </div>
+                          <span className="text-3xl font-black tracking-tight text-green-400 drop-shadow-sm">
+                            {formatPrice(calculateDiscountedPrice(pkg.price))}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-3xl font-black tracking-tight text-foreground">{formatPrice(pkg.price)}</span>
+                      )}
                       <span className="mt-0.5 text-[11px] text-muted-foreground">
                         {formatPrice(pricePerCredit(pkg))} per credit
                       </span>

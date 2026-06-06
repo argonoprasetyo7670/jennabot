@@ -73,7 +73,8 @@ export const ModelName = {
   user_assets: 'user_assets',
   user_credits: 'user_credits',
   users: 'users',
-  verification_tokens: 'verification_tokens'
+  verification_tokens: 'verification_tokens',
+  promo_codes: 'promo_codes'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -385,7 +386,9 @@ export const TransactionsScalarFieldEnum = {
   updatedAt: 'updatedAt',
   fraudStatus: 'fraudStatus',
   midtransResponse: 'midtransResponse',
-  resellerId: 'resellerId'
+  resellerId: 'resellerId',
+  promoCode: 'promoCode',
+  discountAmount: 'discountAmount'
 } as const
 
 export type TransactionsScalarFieldEnum = (typeof TransactionsScalarFieldEnum)[keyof typeof TransactionsScalarFieldEnum]
@@ -479,6 +482,22 @@ export const Verification_tokensScalarFieldEnum = {
 } as const
 
 export type Verification_tokensScalarFieldEnum = (typeof Verification_tokensScalarFieldEnum)[keyof typeof Verification_tokensScalarFieldEnum]
+
+
+export const Promo_codesScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  discountType: 'discountType',
+  discountValue: 'discountValue',
+  maxUses: 'maxUses',
+  currentUses: 'currentUses',
+  expiresAt: 'expiresAt',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type Promo_codesScalarFieldEnum = (typeof Promo_codesScalarFieldEnum)[keyof typeof Promo_codesScalarFieldEnum]
 
 
 export const SortOrder = {
