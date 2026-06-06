@@ -143,8 +143,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Model video belum dipilih." }, { status: 400 })
     }
 
-    // Check credit balance
-    const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
+    // Check credit balance with retry (handles serverless DB cold start SocketTimeout P1008)
+    let credits
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
+        break
+      } catch (err: any) {
+        if (err.code === "P1008" && attempt < 3) {
+          console.warn(`[runway/video-generate] DB timeout, retrying... (${attempt}/3)`)
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+        } else {
+          throw err
+        }
+      }
+    }
     const currentBalance = credits?.balance ?? 0
 
     if (currentBalance < CREDIT_COST_RUNWAY) {

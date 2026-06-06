@@ -23,15 +23,18 @@ import { AdminUsersTab } from "@/components/admin/admin-users-tab"
 import { AdminCreditsTab } from "@/components/admin/admin-credits-tab"
 import { AdminPackagesTab } from "@/components/admin/admin-packages-tab"
 import { AdminHistoryTab } from "@/components/admin/admin-history-tab"
+import { AdminGalleryTab } from "@/components/admin/admin-gallery-tab"
+import { ImageIcon } from "lucide-react"
 
 /* ─── Tab definition ─── */
-type TabId = "users" | "credits" | "packages" | "history"
+type TabId = "users" | "credits" | "packages" | "history" | "gallery"
 
 const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "users", label: "Kelola User", icon: <UserCogIcon className="h-4 w-4" /> },
   { id: "credits", label: "Kelola Credit", icon: <CoinsIcon className="h-4 w-4" /> },
   { id: "packages", label: "Kelola Paket", icon: <BoxIcon className="h-4 w-4" /> },
   { id: "history", label: "Riwayat", icon: <HistoryIcon className="h-4 w-4" /> },
+  { id: "gallery", label: "Kelola Gallery", icon: <ImageIcon className="h-4 w-4" /> },
 ]
 
 /* ─── Stat card config ─── */
@@ -233,6 +236,7 @@ export default function AdminPage() {
           {activeTab === "credits" && <AdminCreditsTab />}
           {activeTab === "packages" && <AdminPackagesTab />}
           {activeTab === "history" && <AdminHistoryTab />}
+          {activeTab === "gallery" && <AdminGalleryTab />}
         </div>
       </div>
 
