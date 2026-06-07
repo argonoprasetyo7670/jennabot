@@ -136,7 +136,9 @@ export async function POST(req: NextRequest) {
 
     // Check credit balance
     const videoCount = count || 1
-    const requiredCredits = videoCount * CREDIT_COST_VIDEO
+    const modelToUse = model || "veo-3.1-lite-low-priority"
+    const costPerVideo = modelToUse === "omni-flash" ? 100 : CREDIT_COST_VIDEO
+    const requiredCredits = videoCount * costPerVideo
     const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
     const currentBalance = credits?.balance ?? 0
 
@@ -265,7 +267,8 @@ async function handlePostResponse(
     // Sync mode: UseAPI returned the full result. Deduct credits and return.
     const media = extractMedia(data)
     console.log(`[video-generate] Sync job done: ${useapiJobId}, videos=${media.length}`)
-    const deducted = await deductCredits(userId, videoCount * CREDIT_COST_VIDEO, feature)
+    const costPerVideo = feature === "omni-flash" ? 100 : CREDIT_COST_VIDEO
+    const deducted = await deductCredits(userId, videoCount * costPerVideo, feature)
     return NextResponse.json({ jobId: useapiJobId || "", status: "done", media, creditsDeducted: deducted })
   }
 }
@@ -351,7 +354,8 @@ export async function GET(req: NextRequest) {
       if (!deductedJobs.has(deductKey)) {
         const videoCount = media.length || 1
         const feat = (data.request as Record<string, unknown>)?.model as string || "video-generator"
-        creditsDeducted = await deductCredits(session.user.id, videoCount * CREDIT_COST_VIDEO, `video-${feat}`)
+        const costPerVideo = feat === "omni-flash" ? 100 : CREDIT_COST_VIDEO
+        creditsDeducted = await deductCredits(session.user.id, videoCount * costPerVideo, `video-${feat}`)
         deductedJobs.set(deductKey, Date.now())
       }
 

@@ -101,9 +101,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 })
     }
 
-    // ── Credit check & pre-deduct ──
     const imageCount = count || 1
     const creditCost = imageCount * CREDIT_COST_IMAGE
+    
+    // ── Credit check & pre-deduct ──
     const deductResult = await deductCredits(
       session.user.id,
       creditCost,

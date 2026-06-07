@@ -15,6 +15,8 @@ import {
   ImageIcon,
   VideoIcon,
   Settings2Icon,
+  FrameIcon,
+  PuzzleIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -24,11 +26,13 @@ import { downloadVideo } from "@/lib/download"
 import type { VideoAspectRatio, VideoDuration, GeneratedVideo } from "@/lib/api/google-flow"
 
 /* ─── Constants ─── */
-const MODEL_ID = "veo-3.1-lite-low-priority" as const
-const MODEL_NAME = "Veo 3.1"
+const MODELS = [
+  { id: "veo-3.1-lite-low-priority" as const, name: "Veo 3.1", cost: CREDIT_COST_VIDEO },
+  { id: "omni-flash" as const, name: "Omni Flash", cost: 100 },
+]
 const ASPECT_RATIOS: VideoAspectRatio[] = ["landscape", "portrait"]
 const VIDEO_COUNTS = [1, 2, 3, 4]
-const DURATIONS: VideoDuration[] = [4, 6, 8]
+const DURATIONS: VideoDuration[] = [4, 6, 8, 10]
 
 interface ReferenceImage {
   file?: File
@@ -44,10 +48,31 @@ interface GalleryItem {
   prompt?: string
 }
 
+function isMediaExpired(url?: string, proxyUrl?: string): boolean {
+  try {
+    const targetUrl = url || proxyUrl
+    if (!targetUrl) return false
+    let checkStr = targetUrl
+    if (targetUrl.includes("/api/ai/video-download")) {
+      const u = new URL(targetUrl, window.location.origin)
+      const encoded = u.searchParams.get("url")
+      if (encoded) checkStr = encoded
+    }
+    const parsed = new URL(checkStr)
+    const expires = parsed.searchParams.get("Expires")
+    if (expires) {
+      return Date.now() / 1000 > parseInt(expires, 10)
+    }
+  } catch { /* ignore */ }
+  return false
+}
+
 export default function AIVideoGeneratorPage() {
   const [selectedRatio, setSelectedRatio] = useState(1) // portrait default
   const [selectedCount, setSelectedCount] = useState(0) // 1
   const [selectedDuration, setSelectedDuration] = useState(2) // 8s
+  const [selectedModel, setSelectedModel] = useState(0) // veo-3.1
+  const [imageMode, setImageMode] = useState<"start" | "reference">("start")
   const [showSettings, setShowSettings] = useState(false)
   const [showPlusMenu, setShowPlusMenu] = useState(false)
   const [showGalleryPicker, setShowGalleryPicker] = useState(false)
@@ -70,7 +95,8 @@ export default function AIVideoGeneratorPage() {
   const generatedVideos = activeJob?.status === "done" ? activeJob.videos : []
   const error = activeJob?.status === "error" ? activeJob.error : null
 
-  const creditCost = (VIDEO_COUNTS[selectedCount] || 1) * CREDIT_COST_VIDEO
+  const activeModel = MODELS[selectedModel]
+  const creditCost = (VIDEO_COUNTS[selectedCount] || 1) * activeModel.cost
 
   // Close settings popup on outside click
   useEffect(() => {
@@ -96,6 +122,13 @@ export default function AIVideoGeneratorPage() {
     return () => document.removeEventListener("mousedown", handleClick)
   }, [showPlusMenu])
 
+  // Reset duration to 8s if 10s is selected and model is not omni-flash
+  useEffect(() => {
+    if (activeModel.id !== "omni-flash" && DURATIONS[selectedDuration] === 10) {
+      setSelectedDuration(2) // index of 8s
+    }
+  }, [activeModel.id, selectedDuration])
+
   const handleGenerate = () => {
     if (!prompt.trim() || isGenerating) return
     setShowSettings(false)
@@ -108,12 +141,13 @@ export default function AIVideoGeneratorPage() {
     const jobId = submitVideoJob(
       {
         prompt: prompt.trim(),
-        model: MODEL_ID,
+        model: activeModel.id,
         aspectRatio: ASPECT_RATIOS[selectedRatio],
         duration: DURATIONS[selectedDuration],
         count: VIDEO_COUNTS[selectedCount],
       },
-      refs.length > 0 ? refs : undefined
+      imageMode === "reference" && refs.length > 0 ? refs : undefined,
+      imageMode === "start" && refs.length > 0 ? { startImage: refs[0] } : undefined
     )
 
     setActiveJobId(jobId)
@@ -230,7 +264,7 @@ export default function AIVideoGeneratorPage() {
               <p className="text-sm font-medium text-foreground/70">
                 {activeJob?.progress || "Sedang membuat video..."}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Menggunakan {MODEL_NAME} • 60-180 detik</p>
+              <p className="text-xs text-muted-foreground mt-1">Menggunakan {activeModel.name} • 60-180 detik</p>
             </div>
           </div>
         ) : isEmpty ? (
@@ -244,34 +278,44 @@ export default function AIVideoGeneratorPage() {
           <div className="w-full max-w-5xl grid gap-4 p-4" style={{
             gridTemplateColumns: generatedVideos.length === 1 ? "1fr" : "repeat(2, 1fr)",
           }}>
-            {generatedVideos.map((vid, i) => (
+            {generatedVideos.map((vid, i) => {
+              const expired = isMediaExpired((vid as any).rawUrl, vid.url)
+              return (
               <div key={i} className="overflow-hidden rounded-2xl border border-border bg-muted/30 animate-fade-up">
-                <div className="relative aspect-video cursor-pointer" onClick={() => setPreviewVideo(vid)}>
-                  <video
-                    src={vid.url}
-                    className="w-full h-full object-contain bg-background"
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                  />
+                <div className="relative aspect-video cursor-pointer" onClick={() => !expired && setPreviewVideo(vid)}>
+                  {expired ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center bg-muted/50 p-4 text-center">
+                      <VideoIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
+                      <p className="text-sm font-medium text-foreground/70">Kedaluwarsa</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 leading-snug max-w-[200px] mx-auto">Link berlaku 24 jam. Jika sudah tersimpan, lihat di Gallery.</p>
+                    </div>
+                  ) : (
+                    <video
+                      src={vid.url}
+                      className="w-full h-full object-contain bg-background"
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                    />
+                  )}
                 </div>
                 <div className="flex items-center justify-between border-t border-border px-3 py-2">
                   <span className="text-[10px] text-muted-foreground">
                     {vid.seed !== undefined ? `Seed: ${vid.seed}` : `Video ${i + 1}`}
                   </span>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setPreviewVideo(vid)} className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Preview">
+                    <button onClick={() => !expired && setPreviewVideo(vid)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Preview">
                       <EyeIcon className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Preview</span>
                     </button>
-                    <button onClick={() => handleDownload(vid.url, `generated-video-${i + 1}.mp4`)} className="flex h-7 items-center gap-1 rounded-md px-2 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Download">
+                    <button onClick={() => !expired && handleDownload(vid.url, `generated-video-${i + 1}.mp4`)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Download">
                       <DownloadIcon className="h-3.5 w-3.5" />
                       <span className="hidden sm:inline">Download</span>
                     </button>
                     <button
                       onClick={async () => {
-                        if (savedVideos.has(vid.url)) return
+                        if (savedVideos.has(vid.url) || expired) return
                         try {
                           const res = await fetch("/api/gallery/save", {
                             method: "POST",
@@ -289,8 +333,8 @@ export default function AIVideoGeneratorPage() {
                           if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
                         } catch { /* ignore */ }
                       }}
-                      disabled={savedVideos.has(vid.url)}
-                      className={`flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted ${savedVideos.has(vid.url) ? "text-emerald-500" : "text-muted-foreground hover:text-foreground"}`}
+                      disabled={savedVideos.has(vid.url) || expired}
+                      className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted", savedVideos.has(vid.url) ? "text-emerald-500" : expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground")}
                       title="Simpan ke Gallery"
                     >
                       <ImagePlusIcon className="h-3.5 w-3.5" />
@@ -299,7 +343,8 @@ export default function AIVideoGeneratorPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -324,28 +369,45 @@ export default function AIVideoGeneratorPage() {
         </div>
 
         <div className="mx-auto max-w-3xl px-4 pb-4">
-          {referenceImages.length > 0 && (
-            <div className="flex gap-2 mb-2 px-1 overflow-x-auto pb-1">
-              {referenceImages.map((ref, i) => (
-                <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
-                  <Image src={ref.preview} alt={`Ref ${i + 1}`} fill className="object-cover" unoptimized />
-                  <button onClick={() => removeReference(i)} className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white text-[8px] shadow-sm">
-                    <XIcon className="h-2.5 w-2.5" />
-                  </button>
-                  {ref.fromGallery && (
-                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-center">
-                      <span className="text-[7px] text-white/70">Gallery</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {referenceImages.length < 3 && (
-                <button onClick={() => setShowPlusMenu(true)} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground/40 transition hover:border-border hover:text-muted-foreground">
-                  <PlusIcon className="h-4 w-4" />
-                </button>
-              )}
+          <div className="mb-2">
+            <div className="flex gap-1 mb-2 bg-muted/40 p-0.5 rounded-lg border border-border/50 max-w-fit mx-auto">
+              <button
+                onClick={() => setImageMode("start")}
+                className={cn("flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium rounded-md transition-all", imageMode === "start" ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}
+              >
+                <FrameIcon className="h-3 w-3" /> Start Frame
+              </button>
+              <button
+                onClick={() => setImageMode("reference")}
+                className={cn("flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium rounded-md transition-all", imageMode === "reference" ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}
+              >
+                <PuzzleIcon className="h-3 w-3" /> Aset Referensi
+              </button>
             </div>
-          )}
+            
+            {referenceImages.length > 0 && (
+              <div className="flex justify-center gap-2 px-1 overflow-x-auto pb-1">
+                {referenceImages.map((ref, i) => (
+                  <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
+                    <Image src={ref.preview} alt={`Ref ${i + 1}`} fill className="object-cover" unoptimized />
+                    <button onClick={() => removeReference(i)} className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white text-[8px] shadow-sm">
+                      <XIcon className="h-2.5 w-2.5" />
+                    </button>
+                    {ref.fromGallery && (
+                      <div className="absolute bottom-0 inset-x-0 bg-black/50 text-center">
+                        <span className="text-[7px] text-white/70">Gallery</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {referenceImages.length < 3 && (
+                  <button onClick={() => setShowPlusMenu(true)} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground/40 transition hover:border-border hover:text-muted-foreground">
+                    <PlusIcon className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="relative flex items-end gap-2 rounded-2xl border border-border bg-card/95 p-2 pl-3 backdrop-blur-xl shadow-2xl">
             <div className="relative" ref={plusMenuRef}>
@@ -386,7 +448,7 @@ export default function AIVideoGeneratorPage() {
                 {/* Desktop: full text */}
                 <button onClick={() => setShowSettings(!showSettings)} className="hidden sm:flex items-center gap-1 rounded-lg bg-muted/50 px-2 py-1.5 text-[10px] text-muted-foreground cursor-pointer transition-all hover:bg-muted">
                   <span>⚡</span>
-                  <span className="font-medium">{MODEL_NAME}</span>
+                  <span className="font-medium">{activeModel.name}</span>
                   <span className="ml-0.5 rounded bg-muted px-1 py-0.5 text-[9px]">{DURATIONS[selectedDuration]}s</span>
                   <ChevronDownIcon className={cn("h-3 w-3 transition-transform", showSettings && "rotate-180")} />
                 </button>
@@ -410,11 +472,14 @@ export default function AIVideoGeneratorPage() {
 
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Durasi Video</p>
                       <div className="flex gap-1.5 mb-3">
-                        {DURATIONS.map((dur, i) => (
-                          <button key={dur} onClick={() => setSelectedDuration(i)} className={cn("flex flex-1 items-center justify-center rounded-lg border py-2.5 text-xs font-medium transition-all", selectedDuration === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
-                            {dur}s
-                          </button>
-                        ))}
+                        {DURATIONS.filter(dur => activeModel.id === "omni-flash" || dur !== 10).map((dur) => {
+                          const i = DURATIONS.indexOf(dur)
+                          return (
+                            <button key={dur} onClick={() => setSelectedDuration(i)} className={cn("flex flex-1 items-center justify-center rounded-lg border py-2.5 text-xs font-medium transition-all", selectedDuration === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
+                              {dur}s
+                            </button>
+                          )
+                        })}
                       </div>
 
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Jumlah Video</p>
@@ -427,10 +492,14 @@ export default function AIVideoGeneratorPage() {
                       </div>
 
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Model</p>
-                      <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2.5 text-xs font-medium text-foreground/70">
-                        <span>⚡</span>
-                        <span>{MODEL_NAME}</span>
-                        <span className="ml-auto text-[9px] text-muted-foreground/50">{CREDIT_COST_VIDEO} credits/video</span>
+                      <div className="flex flex-col gap-1.5">
+                        {MODELS.map((model, i) => (
+                          <button key={model.id} onClick={() => setSelectedModel(i)} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium transition-all", selectedModel === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
+                            <span>⚡</span>
+                            <span>{model.name}</span>
+                            <span className="ml-auto text-[9px] opacity-60">{model.cost} credits/video</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -452,11 +521,14 @@ export default function AIVideoGeneratorPage() {
 
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Durasi Video</p>
                       <div className="flex gap-1.5 mb-3">
-                        {DURATIONS.map((dur, i) => (
-                          <button key={dur} onClick={() => setSelectedDuration(i)} className={cn("flex flex-1 items-center justify-center rounded-lg border py-2 text-xs font-medium transition-all", selectedDuration === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
-                            {dur}s
-                          </button>
-                        ))}
+                        {DURATIONS.filter(dur => activeModel.id === "omni-flash" || dur !== 10).map((dur) => {
+                          const i = DURATIONS.indexOf(dur)
+                          return (
+                            <button key={dur} onClick={() => setSelectedDuration(i)} className={cn("flex flex-1 items-center justify-center rounded-lg border py-2 text-xs font-medium transition-all", selectedDuration === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
+                              {dur}s
+                            </button>
+                          )
+                        })}
                       </div>
 
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Jumlah Video</p>
@@ -469,10 +541,14 @@ export default function AIVideoGeneratorPage() {
                       </div>
 
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 px-0.5">Model</p>
-                      <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2.5 text-xs font-medium text-foreground/70">
-                        <span>⚡</span>
-                        <span>{MODEL_NAME}</span>
-                        <span className="ml-auto text-[9px] text-muted-foreground/50">{CREDIT_COST_VIDEO} credits/video</span>
+                      <div className="flex flex-col gap-1.5">
+                        {MODELS.map((model, i) => (
+                          <button key={model.id} onClick={() => setSelectedModel(i)} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all", selectedModel === i ? "border-border bg-muted text-foreground" : "border-transparent bg-muted/30 text-muted-foreground hover:bg-muted/50")}>
+                            <span>⚡</span>
+                            <span>{model.name}</span>
+                            <span className="ml-auto text-[9px] opacity-60">{model.cost} credits/video</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>

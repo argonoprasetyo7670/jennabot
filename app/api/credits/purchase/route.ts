@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
     await prisma.user_credits.upsert({
       where: { userId: session.user.id },
       create: {
+        id: crypto.randomUUID(),
         userId: session.user.id,
         balance: totalCredits,
         updatedAt: new Date()

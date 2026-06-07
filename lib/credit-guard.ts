@@ -8,6 +8,7 @@ export const CREDIT_COST_CHAT = 1       // per workflow-agent request
 export const CREDIT_COST_MOTION = 120   // per motion-control task
 export const CREDIT_COST_TTS = 3        // per text-to-speech generation
 export const CREDIT_COST_SFX = 5        // per sound effect generation
+export const CREDIT_COST_STORYBOARD = 2 // per storyboard generation
 
 /**
  * Check if a user has enough credits for an operation.

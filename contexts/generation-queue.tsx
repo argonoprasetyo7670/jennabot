@@ -16,6 +16,7 @@ import {
 export const CREDIT_COST_IMAGE = 1  // per image
 export const CREDIT_COST_VIDEO = 5 // per video (Google Flow)
 export const CREDIT_COST_RUNWAY = 120 // per Runway video (Seedance 2.0, Motion Control)
+export const CREDIT_COST_STORYBOARD = 2 // per storyboard generation
 
 
 /* ─── Types ─── */

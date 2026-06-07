@@ -78,6 +78,25 @@ const LANGUAGES = [
   { id: "ar", label: "🇸🇦 العربية", prompt: "speaking in Arabic" },
 ]
 
+function isMediaExpired(url?: string, proxyUrl?: string): boolean {
+  try {
+    const targetUrl = url || proxyUrl
+    if (!targetUrl) return false
+    let checkStr = targetUrl
+    if (targetUrl.includes("/api/ai/video-download")) {
+      const u = new URL(targetUrl, window.location.origin)
+      const encoded = u.searchParams.get("url")
+      if (encoded) checkStr = encoded
+    }
+    const parsed = new URL(checkStr)
+    const expires = parsed.searchParams.get("Expires")
+    if (expires) {
+      return Date.now() / 1000 > parseInt(expires, 10)
+    }
+  } catch { /* ignore */ }
+  return false
+}
+
 export default function ReviewProductPage() {
   const [slots, setSlots] = useState<Record<SlotKey, SlotImage | null>>({ model: null, background: null, product: null })
   const [customPrompt, setCustomPrompt] = useState("")
@@ -85,6 +104,7 @@ export default function ReviewProductPage() {
   const [selectedPose, setSelectedPose] = useState<string | null>(null)
   const [selectedAction, setSelectedAction] = useState<string | null>(null)
   const [selectedLang, setSelectedLang] = useState("id")
+  const [selectedDuration, setSelectedDuration] = useState(8)
   const [phase, setPhase] = useState<Phase>("idle")
   const [generatedImage, setGeneratedImage] = useState<GeneratedImage | null>(null)
   const [generatedVideo, setGeneratedVideo] = useState<GeneratedVideo | null>(null)
@@ -217,7 +237,7 @@ export default function ReviewProductPage() {
       console.log("[review-product] Starting video generation with startImage:", img.mediaGenerationId)
       const vidResult = await generateVideos({
         prompt: videoPrompt, model: "veo-3.1-lite-low-priority", aspectRatio: "portrait",
-        duration: 8, count: 1,
+        duration: selectedDuration as any, count: 1,
         startImage: img.mediaGenerationId,
         email,
       })
@@ -367,6 +387,19 @@ export default function ReviewProductPage() {
                 ))}
               </div>
             </div>
+            {/* Durasi */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">⏱️ Durasi Video</label>
+              <div className="flex flex-wrap gap-2">
+                {[4, 6, 8].map((dur) => (
+                  <button key={dur} onClick={() => setSelectedDuration(dur)}
+                    className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                      selectedDuration === dur ? "border-violet-500 bg-violet-500/20 text-violet-300" : "border-border bg-card/50 text-muted-foreground hover:border-border/80 hover:bg-muted/50")}>
+                    {dur} Detik
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Custom Instructions */}
@@ -454,24 +487,34 @@ export default function ReviewProductPage() {
               )}
 
               {/* Generated Video */}
-              {generatedVideo && (
+              {generatedVideo && (() => {
+                const expired = isMediaExpired((generatedVideo as any).rawUrl, generatedVideo.url)
+                return (
                 <div>
                   <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
                     <PlayIcon className="h-4 w-4 text-blue-400" /> Video Review
                   </h2>
                   <div className="overflow-hidden rounded-2xl border border-border bg-card/50">
-                    <div className="relative aspect-[9/16] max-h-[500px] mx-auto cursor-pointer" onClick={() => setPreviewVideo(generatedVideo)}>
-                      <video src={(generatedVideo as GeneratedVideo & { proxyUrl?: string }).proxyUrl || generatedVideo.url} className="h-full w-full object-contain bg-background" muted loop autoPlay playsInline crossOrigin="anonymous" />
+                    <div className="relative aspect-[9/16] max-h-[500px] mx-auto cursor-pointer" onClick={() => !expired && setPreviewVideo(generatedVideo)}>
+                      {expired ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30 p-6 text-center">
+                          <VideoIcon className="mb-3 h-10 w-10 text-muted-foreground/30" />
+                          <p className="text-sm font-medium text-foreground/70">Kedaluwarsa</p>
+                          <p className="text-xs text-muted-foreground mt-1 max-w-[250px] mx-auto">Link berlaku 24 jam. Jika sudah tersimpan, lihat di Gallery.</p>
+                        </div>
+                      ) : (
+                        <video src={(generatedVideo as GeneratedVideo & { proxyUrl?: string }).proxyUrl || generatedVideo.url} className="h-full w-full object-contain bg-background" muted loop autoPlay playsInline crossOrigin="anonymous" />
+                      )}
                     </div>
                     <div className="flex justify-center gap-1 border-t border-border py-2">
-                      <button onClick={() => setPreviewVideo(generatedVideo)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                      <button onClick={() => !expired && setPreviewVideo(generatedVideo)} disabled={expired} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
                         <PlayIcon className="h-3.5 w-3.5" /> Fullscreen
                       </button>
-                      <button onClick={() => handleDownload(generatedVideo.rawUrl || generatedVideo.url, "review-video.mp4")} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition">
+                      <button onClick={() => !expired && handleDownload(generatedVideo.rawUrl || generatedVideo.url, "review-video.mp4")} disabled={expired} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
                         <DownloadIcon className="h-3.5 w-3.5" /> Download
                       </button>
                       <button
-                        disabled={savedVideo || savingVideo}
+                        disabled={savedVideo || savingVideo || expired}
                         onClick={async () => {
                           setSavingVideo(true)
                           try {
@@ -483,14 +526,14 @@ export default function ReviewProductPage() {
                           } catch { /* ignore */ } finally { setSavingVideo(false) }
                         }}
                         className={cn("flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition",
-                          savedVideo ? "text-green-400" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
+                          savedVideo ? "text-green-400" : expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")}
                       >
                         {savedVideo ? <><CheckIcon className="h-3.5 w-3.5" /> Tersimpan</> : savingVideo ? <><Loader2Icon className="h-3.5 w-3.5 animate-spin" /> Menyimpan...</> : <><BookmarkIcon className="h-3.5 w-3.5" /> Simpan</>}
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
+              )})()}
             </div>
           )}
         </div>

@@ -385,6 +385,25 @@ function JobItem({
   )
 }
 
+function isMediaExpired(url?: string, proxyUrl?: string): boolean {
+  try {
+    const targetUrl = url || proxyUrl
+    if (!targetUrl) return false
+    let checkStr = targetUrl
+    if (targetUrl.includes("/api/ai/video-download")) {
+      const u = new URL(targetUrl, window.location.origin)
+      const encoded = u.searchParams.get("url")
+      if (encoded) checkStr = encoded
+    }
+    const parsed = new URL(checkStr)
+    const expires = parsed.searchParams.get("Expires")
+    if (expires) {
+      return Date.now() / 1000 > parseInt(expires, 10)
+    }
+  } catch { /* ignore */ }
+  return false
+}
+
 /* ─── Job Preview Modal (full-screen image/video viewer with gallery save) ─── */
 function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => void }) {
   const [currentIndex, setCurrentIndex] = React.useState(0)
@@ -463,7 +482,11 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
     }
   }
 
-  const currentUrl = isVideo ? videos[currentIndex]?.url : images[currentIndex]?.url
+  const currentItem = isVideo ? videos[currentIndex] : images[currentIndex]
+  // Fallback to rawUrl if available (videos)
+  const rawUrl = isVideo ? (currentItem as any)?.rawUrl : undefined
+  const currentUrl = currentItem?.url
+  const expired = isMediaExpired(rawUrl, currentUrl)
   const fileExt = isVideo ? "mp4" : "png"
   const currentItemKey = `${isVideo ? "v" : "i"}-${currentIndex}`
   const isCurrentSaved = savedItems.has(currentItemKey)
@@ -516,7 +539,13 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
           className={cn("relative w-full max-w-3xl", isVideo ? "max-h-[70vh]" : "max-h-[65vh] sm:max-h-[70vh] aspect-square")}
           onClick={(e) => e.stopPropagation()}
         >
-          {isVideo ? (
+          {expired ? (
+            <div className="flex h-[300px] sm:h-[400px] w-full flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-6 text-center shadow-inner">
+              {isVideo ? <VideoIcon className="mb-3 h-12 w-12 text-white/30" /> : <ImageIcon className="mb-3 h-12 w-12 text-white/30" />}
+              <p className="text-lg font-semibold text-white/80">Link Kedaluwarsa</p>
+              <p className="mt-2 max-w-sm text-sm text-white/50">Link media ini hanya berlaku selama 24 jam. Jika sudah tersimpan di Gallery, Anda bisa melihatnya di sana.</p>
+            </div>
+          ) : isVideo ? (
             <video
               key={currentIndex}
               src={currentUrl}
@@ -579,20 +608,21 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
       <div className="flex items-center justify-center gap-2 px-4 pb-6 pt-2 sm:pb-8">
         <button
           onClick={() => handleDownload(currentUrl || "", `jenna-${job.id}-${currentIndex + 1}.${fileExt}`)}
-          className="flex h-11 items-center gap-2 rounded-xl bg-white/10 px-5 text-sm text-white/90 transition hover:bg-white/20 active:scale-95"
+          disabled={expired}
+          className={cn("flex h-11 items-center gap-2 rounded-xl px-5 text-sm transition", expired ? "bg-white/5 text-white/30 cursor-not-allowed" : "bg-white/10 text-white/90 hover:bg-white/20 active:scale-95")}
         >
           <DownloadIcon className="h-4 w-4" />
           Download
         </button>
         <button
           onClick={handleSaveToGallery}
-          disabled={isSaving || isCurrentSaved}
+          disabled={isSaving || isCurrentSaved || expired}
           className={cn(
             "flex h-11 items-center gap-2 rounded-xl px-5 text-sm transition active:scale-95",
             isCurrentSaved
               ? "bg-green-500/20 text-green-400 border border-green-500/30"
-              : isSaving
-                ? "bg-white/5 text-white/50"
+              : isSaving || expired
+                ? "bg-white/5 text-white/30 cursor-not-allowed"
                 : "bg-white/10 text-white/90 hover:bg-white/20"
           )}
         >

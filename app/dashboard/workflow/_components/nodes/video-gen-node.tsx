@@ -4,7 +4,7 @@ import { Handle, Position, useReactFlow } from "@xyflow/react"
 import type { NodeProps } from "@xyflow/react"
 import {
   FileTextIcon, ImageIcon, VideoIcon, LayoutGridIcon, Loader2Icon, PlayIcon,
-  XCircleIcon, XIcon, FolderPlusIcon, MonitorIcon, MoreHorizontalIcon, ScanEyeIcon, DownloadIcon,
+  XCircleIcon, XIcon, FolderPlusIcon, MonitorIcon, MoreHorizontalIcon, ScanEyeIcon, DownloadIcon, FrameIcon, PuzzleIcon
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NodeShell, NodeCloseBtn, HandleIcon, getPortColor } from "../node-shell"
@@ -29,6 +29,8 @@ export function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
     handleGenerate, handleDownload, handleSaveGallery, fmtTime,
   } = useVideoGenerateNode(nodeId, nd, activePrompt, connectedImage, connectedMediaId, connectedEmail)
 
+  const imageMode = (nd.imageMode as string) || "start"
+
   return (
     <>
     <div className="relative">
@@ -36,7 +38,7 @@ export function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
       <NodeShell label="Video Generate" icon="🎬" nodeType="videoGenNode" status={(nd._runStatus || nd.status) as string} nodeId={nodeId}>
         {/* Handles */}
         <HandleIcon icon={FileTextIcon} side="left" top="25%" title="Input: Prompt" />
-        <HandleIcon icon={ImageIcon} side="left" top="45%" title="Input: Start Image" />
+        <HandleIcon icon={imageMode === "start" ? FrameIcon : PuzzleIcon} side="left" top="45%" title={`Input: ${imageMode === "start" ? "Frame" : "Aset"}`} />
         <HandleIcon icon={LayoutGridIcon} side="right" top="40%" title="Output: Generated Video" />
         <Handle type="target" position={Position.Left} id="prompt" style={{ background: getPortColor("prompt"), width: 10, height: 10, border: "2px solid var(--background)", top: "25%" }} />
         <Handle type="target" position={Position.Left} id="startImage" style={{ background: getPortColor("startImage"), width: 10, height: 10, border: "2px solid var(--background)", top: "45%" }} />
@@ -70,12 +72,30 @@ export function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
           )}
         </div>
 
-        {/* Connected start image indicator */}
+        {/* Image Mode Toggle */}
+        <div className="flex bg-muted/50 p-0.5 rounded-lg mb-2 border border-border/50">
+          <button 
+            onClick={() => updateNodeData(nodeId, { imageMode: "start" })}
+            disabled={isGenerating}
+            className={cn("flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium rounded-md transition-all", imageMode === "start" ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}
+          >
+            <FrameIcon className="h-3.5 w-3.5" /> Frame
+          </button>
+          <button 
+            onClick={() => updateNodeData(nodeId, { imageMode: "reference" })}
+            disabled={isGenerating}
+            className={cn("flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium rounded-md transition-all", imageMode === "reference" ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}
+          >
+            <PuzzleIcon className="h-3.5 w-3.5" /> Aset
+          </button>
+        </div>
+
+        {/* Connected image indicator */}
         {connectedImage && (
           <div className="flex items-center gap-2 rounded-lg bg-blue-500/5 border border-blue-500/20 px-2 py-1 mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={connectedImage} alt="Start" className="h-6 w-6 rounded object-cover border border-border" />
-            <p className="text-[10px] text-muted-foreground">Start image</p>
+            <img src={connectedImage} alt="Input" className="h-6 w-6 rounded object-cover border border-border" />
+            <p className="text-[10px] text-muted-foreground">{imageMode === "start" ? "Start frame" : "Aset referensi"}</p>
           </div>
         )}
 
@@ -125,10 +145,6 @@ export function VideoGenNodeComponent({ data, id: nodeId }: NodeProps) {
               </button>
             ))}
           </div>
-          <div className="h-4 w-px bg-border/50" />
-          <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition">
-            <ScanEyeIcon className="h-3 w-3" /> Start Frame
-          </button>
           <div className="h-4 w-px bg-border/50" />
           <button className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition">
             <MoreHorizontalIcon className="h-3.5 w-3.5" />

@@ -208,14 +208,23 @@ async function executeVideoGenNode(
   const arMap: Record<string, "landscape" | "portrait"> = { "16:9": "landscape", "9:16": "portrait" }
   const durMap: Record<string, number> = { "5s": 4, "8s": 8 }
 
-  const result = await generateVideos({
+  const imageMode = (nd.imageMode as string) || "start"
+  
+  const generateParams: Parameters<typeof generateVideos>[0] = {
     prompt: prompt.trim(),
     model: ((nd.model as string) || "veo-3.1-lite-low-priority") as "veo-3.1-lite-low-priority",
     aspectRatio: arMap[(nd.aspectRatio as string) || "16:9"] || "landscape",
     duration: (durMap[(nd.duration as string) || "8s"] || 8) as 8,
-    startImage: startImageId,
     ...(videoEmail ? { email: videoEmail } : {}),
-  })
+  }
+
+  if (startImageId) {
+    if (imageMode === "start") generateParams.startImage = startImageId
+    else if (imageMode === "end") generateParams.endImage = startImageId
+    else if (imageMode === "reference") generateParams.referenceImages = [startImageId]
+  }
+
+  const result = await generateVideos(generateParams)
 
   const vid = result.videos[0]
   return {

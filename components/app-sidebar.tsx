@@ -105,7 +105,7 @@ const navItems: NavItem[] = [
       { title: "Seedance 2.0", url: "/dashboard/seedance" },
       { title: "Motion Control", url: "/dashboard/motion-control" },
       // { title: "Storyboard", url: "/dashboard/storyboard" },
-      // { title: "Scene Builder", url: "/dashboard/scene-builder" },
+      { title: "Scene Builder", url: "/dashboard/scene-builder" },
       { title: "Video Template", url: "/dashboard/video-template" },
       // { title: "TikTok Hook Generator", url: "/dashboard/tiktok-hook-gen" },
       // { title: "Extend Video", url: "/dashboard/extend-video" },
