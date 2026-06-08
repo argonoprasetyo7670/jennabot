@@ -13,11 +13,27 @@ const DEDUCTED_KEYS = new Set<string>()
  * UseAPI sends the same format as the job status response.
  */
 function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] {
+  const normalizeMedia = (arr: Record<string, unknown>[]) => arr.map(m => {
+    if (m.videoUrl) return m; // already normalized
+    const v = m.video as Record<string, unknown> | undefined;
+    const gv = m.generatedVideo as Record<string, unknown> | undefined;
+    const meta = m.metadata as Record<string, unknown> | undefined;
+    const metaV = meta?.video as Record<string, unknown> | undefined;
+    
+    const url = m.fifeUrl || m.uri || m.url || v?.fifeUrl || v?.uri || gv?.fifeUrl || gv?.uri || metaV?.fifeUrl || metaV?.servingBaseUri || metaV?.uri;
+    
+    return {
+      ...m,
+      videoUrl: url,
+      mediaGenerationId: m.mediaGenerationId || metaV?.mediaGenerationId || v?.mediaGenerationId
+    };
+  });
+
   // Direct media array
-  if (Array.isArray(data.media)) return data.media as Record<string, unknown>[]
+  if (Array.isArray(data.media)) return normalizeMedia(data.media as Record<string, unknown>[]);
 
   const response = data.response as Record<string, unknown> | undefined
-  if (response && Array.isArray(response.media)) return response.media as Record<string, unknown>[]
+  if (response && Array.isArray(response.media)) return normalizeMedia(response.media as Record<string, unknown>[]);
 
   // Async format: response.operations[]
   if (response && Array.isArray(response.operations)) {

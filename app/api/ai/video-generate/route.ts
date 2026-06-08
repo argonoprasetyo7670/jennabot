@@ -55,15 +55,31 @@ async function getCaptchaToken(): Promise<string | null> {
  * Handles both sync format (response.media[].videoUrl) and async format (response.operations[].video.fifeUrl).
  */
 function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] {
+  const normalizeMedia = (arr: Record<string, unknown>[]) => arr.map(m => {
+    if (m.videoUrl) return m; // already normalized
+    const v = m.video as Record<string, unknown> | undefined;
+    const gv = m.generatedVideo as Record<string, unknown> | undefined;
+    const meta = m.metadata as Record<string, unknown> | undefined;
+    const metaV = meta?.video as Record<string, unknown> | undefined;
+    
+    const url = m.fifeUrl || m.uri || m.url || v?.fifeUrl || v?.uri || gv?.fifeUrl || gv?.uri || metaV?.fifeUrl || metaV?.servingBaseUri || metaV?.uri;
+    
+    return {
+      ...m,
+      videoUrl: url,
+      mediaGenerationId: m.mediaGenerationId || metaV?.mediaGenerationId || v?.mediaGenerationId
+    };
+  });
+
   // Direct media array (sync POST response)
   if (Array.isArray(data.media)) {
-    return data.media
+    return normalizeMedia(data.media as Record<string, unknown>[]);
   }
 
   // Nested response.media (job status response)
   const response = data.response as Record<string, unknown> | undefined
   if (response && Array.isArray(response.media)) {
-    return response.media
+    return normalizeMedia(response.media as Record<string, unknown>[]);
   }
 
   // Async format: response.operations[] → convert to media format
