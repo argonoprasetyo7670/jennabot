@@ -176,114 +176,114 @@ function submitJobToStore(
 
   addJobToStore(job)
 
-  // Fire and forget — runs on window, independent of React
-  ;(async () => {
-    try {
-      const refs: string[] = []
-      let email: string | undefined
+    // Fire and forget — runs on window, independent of React
+    ; (async () => {
+      try {
+        const refs: string[] = []
+        let email: string | undefined
 
-      if (references?.length) {
-        for (let i = 0; i < references.length; i++) {
-          const ref = references[i]
-          updateJobInStore(id, {
-            status: "uploading",
-            progress: `Mengupload referensi ${i + 1}/${references.length}...`,
-          })
+        if (references?.length) {
+          for (let i = 0; i < references.length; i++) {
+            const ref = references[i]
+            updateJobInStore(id, {
+              status: "uploading",
+              progress: `Mengupload referensi ${i + 1}/${references.length}...`,
+            })
 
-          let result
-          if (ref.file) {
-            result = await uploadImageAsset(ref.file, email)
-          } else if (ref.galleryUrl) {
-            result = await uploadImageFromUrl(ref.galleryUrl, email)
+            let result
+            if (ref.file) {
+              result = await uploadImageAsset(ref.file, email)
+            } else if (ref.galleryUrl) {
+              result = await uploadImageFromUrl(ref.galleryUrl, email)
+            }
+
+            if (result) {
+              if (!email && result.email) email = result.email
+              refs.push(result.mediaGenerationId)
+            }
+          }
+        }
+
+        updateJobInStore(id, { status: "generating", progress: "Mengirim ke server..." })
+
+        const body: Record<string, unknown> = {
+          prompt: params.prompt,
+          model: params.model || "nano-banana-pro",
+          aspectRatio: params.aspectRatio || "9:16",
+          count: params.count || 1,
+          async: true,
+        }
+        if (params.seed !== undefined) body.seed = params.seed
+        if (email) body.email = email
+        if (refs.length > 0) body.references = refs
+
+        const startRes = await fetch("/api/ai/image-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const startData = await startRes.json()
+
+        if (!startRes.ok) {
+          throw new Error(
+            typeof startData.error === "string" ? startData.error : `Gagal memulai (${startRes.status})`
+          )
+        }
+
+        const useapiJobId = startData.jobId as string
+        if (!useapiJobId) throw new Error("Server tidak mengembalikan jobId")
+
+        // ── Persist serverJobId immediately so resume-on-refresh works ──
+        updateJobInStore(id, {
+          serverJobId: useapiJobId,
+          progress: "Membuat gambar... (10-60 detik)",
+        })
+
+        // ── Poll until done ──
+        const POLL_INTERVAL = 5000
+        const MAX_POLLS = 24 // 2 minutes max for images
+
+        for (let i = 0; i < MAX_POLLS; i++) {
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+          const pollRes = await fetch(`/api/ai/image-generate?jobId=${encodeURIComponent(useapiJobId)}`)
+          const pollData = await pollRes.json()
+
+          if (pollData.status === "processing") {
+            updateJobInStore(id, { progress: `Membuat gambar... (${(i + 1) * 5}s)` })
+            continue
           }
 
-          if (result) {
-            if (!email && result.email) email = result.email
-            refs.push(result.mediaGenerationId)
+          if (pollData.status === "error") {
+            throw new Error(pollData.error || "Image generation failed")
+          }
+
+          if (pollData.status === "done") {
+            const images = pollData.images || []
+            if (images.length === 0) throw new Error("Tidak ada gambar yang dihasilkan")
+
+            window.dispatchEvent(new CustomEvent("credits-updated"))
+            updateJobInStore(id, {
+              status: "done",
+              progress: undefined,
+              images,
+              creditsDeducted: (body.count as number) * CREDIT_COST_IMAGE,
+              completedAt: new Date(),
+            })
+            return
           }
         }
+
+        throw new Error("Timeout: image generation melebihi 2 menit")
+      } catch (err) {
+        updateJobInStore(id, {
+          status: "error",
+          progress: undefined,
+          error: err instanceof Error ? err.message : "Generation failed",
+          completedAt: new Date(),
+        })
       }
-
-      updateJobInStore(id, { status: "generating", progress: "Mengirim ke server..." })
-
-      const body: Record<string, unknown> = {
-        prompt: params.prompt,
-        model: params.model || "nano-banana-pro",
-        aspectRatio: params.aspectRatio || "9:16",
-        count: params.count || 1,
-        async: true,
-      }
-      if (params.seed !== undefined) body.seed = params.seed
-      if (email) body.email = email
-      if (refs.length > 0) body.references = refs
-
-      const startRes = await fetch("/api/ai/image-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-      const startData = await startRes.json()
-      
-      if (!startRes.ok) {
-        throw new Error(
-          typeof startData.error === "string" ? startData.error : `Gagal memulai (${startRes.status})`
-        )
-      }
-
-      const useapiJobId = startData.jobId as string
-      if (!useapiJobId) throw new Error("Server tidak mengembalikan jobId")
-
-      // ── Persist serverJobId immediately so resume-on-refresh works ──
-      updateJobInStore(id, {
-        serverJobId: useapiJobId,
-        progress: "Membuat gambar... (10-60 detik)",
-      })
-
-      // ── Poll until done ──
-      const POLL_INTERVAL = 5000
-      const MAX_POLLS = 24 // 2 minutes max for images
-
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL))
-
-        const pollRes = await fetch(`/api/ai/image-generate?jobId=${encodeURIComponent(useapiJobId)}`)
-        const pollData = await pollRes.json()
-
-        if (pollData.status === "processing") {
-          updateJobInStore(id, { progress: `Membuat gambar... (${(i + 1) * 5}s)` })
-          continue
-        }
-
-        if (pollData.status === "error") {
-          throw new Error(pollData.error || "Image generation failed")
-        }
-
-        if (pollData.status === "done") {
-          const images = pollData.images || []
-          if (images.length === 0) throw new Error("Tidak ada gambar yang dihasilkan")
-
-          window.dispatchEvent(new CustomEvent("credits-updated"))
-          updateJobInStore(id, {
-            status: "done",
-            progress: undefined,
-            images,
-            creditsDeducted: (body.count as number) * CREDIT_COST_IMAGE,
-            completedAt: new Date(),
-          })
-          return
-        }
-      }
-
-      throw new Error("Timeout: image generation melebihi 2 menit")
-    } catch (err) {
-      updateJobInStore(id, {
-        status: "error",
-        progress: undefined,
-        error: err instanceof Error ? err.message : "Generation failed",
-        completedAt: new Date(),
-      })
-    }
-  })()
+    })()
 
   return id
 }
@@ -313,167 +313,163 @@ function submitVideoJobToStore(
 
   addJobToStore(job)
 
-  ;(async () => {
-    try {
-      let email: string | undefined
-      const videoParams: GenerateVideoParams = { ...params }
+    ; (async () => {
+      try {
+        let email: string | undefined
+        const videoParams: GenerateVideoParams = { ...params }
 
-      // Upload start frame
-      if (frameRefs?.startImage) {
-        updateJobInStore(id, { status: "uploading", progress: "Mengupload start frame..." })
-        let result
-        if (frameRefs.startImage.file) {
-          result = await uploadImageAsset(frameRefs.startImage.file, email)
-        } else if (frameRefs.startImage.galleryUrl) {
-          result = await uploadImageFromUrl(frameRefs.startImage.galleryUrl, email)
-        }
-        if (result) {
-          if (!email && result.email) email = result.email
-          videoParams.startImage = result.mediaGenerationId
-        }
-      }
-
-      // Upload end frame
-      if (frameRefs?.endImage) {
-        updateJobInStore(id, { status: "uploading", progress: "Mengupload end frame..." })
-        let result
-        if (frameRefs.endImage.file) {
-          result = await uploadImageAsset(frameRefs.endImage.file, email)
-        } else if (frameRefs.endImage.galleryUrl) {
-          result = await uploadImageFromUrl(frameRefs.endImage.galleryUrl, email)
-        }
-        if (result) {
-          if (!email && result.email) email = result.email
-          videoParams.endImage = result.mediaGenerationId
-        }
-      }
-
-      // Upload reference images (R2V)
-      if (references?.length) {
-        const refIds: string[] = []
-        for (let i = 0; i < references.length; i++) {
-          const ref = references[i]
-          updateJobInStore(id, { status: "uploading", progress: `Mengupload referensi ${i + 1}/${references.length}...` })
+        // Upload start frame
+        if (frameRefs?.startImage) {
+          updateJobInStore(id, { status: "uploading", progress: "Mengupload start frame..." })
           let result
-          if (ref.file) {
-            result = await uploadImageAsset(ref.file, email)
-          } else if (ref.galleryUrl) {
-            result = await uploadImageFromUrl(ref.galleryUrl, email)
+          if (frameRefs.startImage.file) {
+            result = await uploadImageAsset(frameRefs.startImage.file, email)
+          } else if (frameRefs.startImage.galleryUrl) {
+            result = await uploadImageFromUrl(frameRefs.startImage.galleryUrl, email)
           }
           if (result) {
             if (!email && result.email) email = result.email
-            refIds.push(result.mediaGenerationId)
+            videoParams.startImage = result.mediaGenerationId
           }
         }
-        if (refIds.length > 0) videoParams.referenceImages = refIds
-      }
 
-      if (email) videoParams.email = email
-
-      updateJobInStore(id, { status: "generating", progress: "Mengirim ke server..." })
-
-      // ── POST to start async generation ──
-      const body: Record<string, unknown> = {
-        prompt: videoParams.prompt,
-        model: videoParams.model || "veo-3.1-lite-low-priority",
-        aspectRatio: videoParams.aspectRatio || "landscape",
-        duration: videoParams.duration || 8,
-        count: videoParams.count || 1,
-        async: true,
-      }
-      if (videoParams.seed !== undefined) body.seed = videoParams.seed
-      if (videoParams.email) body.email = videoParams.email
-      if (videoParams.startImage) body.startImage = videoParams.startImage
-      if (videoParams.endImage) body.endImage = videoParams.endImage
-      if (videoParams.voice) body.voice = videoParams.voice
-      if (videoParams.referenceImages?.length) body.referenceImages = videoParams.referenceImages
-
-      const startRes = await fetch("/api/ai/video-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-      const startData = await startRes.json()
-      if (!startRes.ok) {
-        throw new Error(
-          typeof startData.error === "string" ? startData.error : `Gagal memulai (${startRes.status})`
-        )
-      }
-
-      const useapiJobId = startData.jobId as string
-      if (!useapiJobId) throw new Error("Server tidak mengembalikan jobId")
-
-      // ── Persist serverJobId immediately so resume-on-refresh works ──
-      updateJobInStore(id, {
-        serverJobId: useapiJobId,
-        progress: "Membuat video... (60-180 detik)",
-      })
-
-      // ── Poll until done ──
-      const POLL_INTERVAL = 5000
-      const MAX_POLLS = 60 // 5 minutes
-
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL))
-
-        const pollRes = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(useapiJobId)}`)
-        const pollData = await pollRes.json()
-
-        if (pollData.status === "processing") {
-          updateJobInStore(id, { progress: `Membuat video... (${(i + 1) * 5}s)` })
-          continue
+        // Upload end frame
+        if (frameRefs?.endImage) {
+          updateJobInStore(id, { status: "uploading", progress: "Mengupload end frame..." })
+          let result
+          if (frameRefs.endImage.file) {
+            result = await uploadImageAsset(frameRefs.endImage.file, email)
+          } else if (frameRefs.endImage.galleryUrl) {
+            result = await uploadImageFromUrl(frameRefs.endImage.galleryUrl, email)
+          }
+          if (result) {
+            if (!email && result.email) email = result.email
+            videoParams.endImage = result.mediaGenerationId
+          }
         }
 
-        if (pollData.status === "error") {
-          throw new Error(pollData.error || "Video generation failed")
+        // Upload reference images (R2V)
+        if (references?.length) {
+          const refIds: string[] = []
+          for (let i = 0; i < references.length; i++) {
+            const ref = references[i]
+            updateJobInStore(id, { status: "uploading", progress: `Mengupload referensi ${i + 1}/${references.length}...` })
+            let result
+            if (ref.file) {
+              result = await uploadImageAsset(ref.file, email)
+            } else if (ref.galleryUrl) {
+              result = await uploadImageFromUrl(ref.galleryUrl, email)
+            }
+            if (result) {
+              if (!email && result.email) email = result.email
+              refIds.push(result.mediaGenerationId)
+            }
+          }
+          if (refIds.length > 0) videoParams.referenceImages = refIds
         }
 
-        if (pollData.status === "done") {
-          const videos = (pollData.media || [])
-            .map((m: Record<string, unknown>) => {
-              const videoUrl = m.videoUrl as string | undefined
-              if (!videoUrl) return null
-              const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
-              const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
-              return {
-                url: proxyUrl,
-                rawUrl: videoUrl,
-                thumbnailUrl: m.thumbnailUrl as string | undefined,
-                seed: gen?.seed as number | undefined,
-                mediaGenerationId: m.mediaGenerationId as string | undefined,
-                model: gen?.model as string | undefined,
-                aspectRatio: gen?.aspectRatio as string | undefined,
-                prompt: gen?.prompt as string | undefined,
-              }
+        if (email) videoParams.email = email
+
+        updateJobInStore(id, { status: "generating", progress: "Mengirim ke server..." })
+
+        // ── POST to start async generation ──
+        const body: Record<string, unknown> = {
+          prompt: videoParams.prompt,
+          model: videoParams.model || "veo-3.1-lite-low-priority",
+          aspectRatio: videoParams.aspectRatio || "landscape",
+          duration: videoParams.duration || 8,
+          count: videoParams.count || 1,
+          async: true,
+        }
+        if (videoParams.seed !== undefined) body.seed = videoParams.seed
+        if (videoParams.email) body.email = videoParams.email
+        if (videoParams.startImage) body.startImage = videoParams.startImage
+        if (videoParams.endImage) body.endImage = videoParams.endImage
+        if (videoParams.voice) body.voice = videoParams.voice
+        if (videoParams.referenceImages?.length) body.referenceImages = videoParams.referenceImages
+
+        const startRes = await fetch("/api/ai/video-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const startData = await startRes.json()
+        if (!startRes.ok) {
+          throw new Error(
+            typeof startData.error === "string" ? startData.error : `Gagal memulai (${startRes.status})`
+          )
+        }
+
+        const useapiJobId = startData.jobId as string
+        if (!useapiJobId) throw new Error("Server tidak mengembalikan jobId")
+
+        // ── Persist serverJobId immediately so resume-on-refresh works ──
+        updateJobInStore(id, {
+          serverJobId: useapiJobId,
+          progress: "Membuat video... (60-180 detik)",
+        })
+
+        // ── Poll until done ──
+        const POLL_INTERVAL = 5000
+        const MAX_POLLS = 60 // 5 minutes
+
+        for (let i = 0; i < MAX_POLLS; i++) {
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL))
+
+          const pollRes = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(useapiJobId)}`)
+          const pollData = await pollRes.json()
+
+          if (pollData.status === "processing") {
+            updateJobInStore(id, { progress: `Membuat video... (${(i + 1) * 5}s)` })
+            continue
+          }
+
+          if (pollData.status === "error") {
+            throw new Error(pollData.error || "Video generation failed")
+          }
+
+          if (pollData.status === "done") {
+            const videos = (pollData.media || [])
+              .map((m: Record<string, unknown>) => {
+                const videoUrl = m.videoUrl as string | undefined
+                if (!videoUrl) return null
+                const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
+                const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
+                return {
+                  url: proxyUrl,
+                  rawUrl: videoUrl,
+                  thumbnailUrl: m.thumbnailUrl as string | undefined,
+                  seed: gen?.seed as number | undefined,
+                  mediaGenerationId: m.mediaGenerationId as string | undefined,
+                  model: gen?.model as string | undefined,
+                  aspectRatio: gen?.aspectRatio as string | undefined,
+                  prompt: gen?.prompt as string | undefined,
+                }
+              })
+              .filter(Boolean)
+
+            window.dispatchEvent(new CustomEvent("credits-updated"))
+            updateJobInStore(id, {
+              status: "done",
+              progress: undefined,
+              videos,
+              creditsDeducted: pollData.creditsDeducted || 0,
+              completedAt: new Date(),
             })
-            .filter(Boolean)
-
-          if (videos.length === 0) {
-            throw new Error(`DEBUG_JSON: ${JSON.stringify(pollData.media)}`)
+            return
           }
-
-          window.dispatchEvent(new CustomEvent("credits-updated"))
-          updateJobInStore(id, {
-            status: "done",
-            progress: undefined,
-            videos,
-            creditsDeducted: pollData.creditsDeducted || 0,
-            completedAt: new Date(),
-          })
-          return
         }
-      }
 
-      throw new Error("Timeout: video generation melebihi 5 menit")
-    } catch (err) {
-      updateJobInStore(id, {
-        status: "error",
-        progress: undefined,
-        error: err instanceof Error ? err.message : "Video generation failed",
-        completedAt: new Date(),
-      })
-    }
-  })()
+        throw new Error("Timeout: video generation melebihi 5 menit")
+      } catch (err) {
+        updateJobInStore(id, {
+          status: "error",
+          progress: undefined,
+          error: err instanceof Error ? err.message : "Video generation failed",
+          completedAt: new Date(),
+        })
+      }
+    })()
 
   return id
 }
@@ -543,7 +539,7 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
             mediaGenerationId: img.mediaGenerationId || "",
             sourceAction: "image-generator",
           }),
-        }).catch(() => {})
+        }).catch(() => { })
       }
 
       // Save videos
@@ -564,7 +560,7 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
             mediaGenerationId: (vid as any).mediaGenerationId || (vid as any).assetId || "",
             sourceAction: job.model?.includes("Seedance") ? "seedance-2" : job.model?.includes("Motion Control") ? "motion-control" : "video-generator",
           }),
-        }).catch(() => {})
+        }).catch(() => { })
       }
     }
   }, [jobs])
@@ -593,7 +589,7 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
       updateJobInStore(localId, { progress: "Melanjutkan setelah refresh..." })
 
       if (job.type === "video") {
-        ;(async () => {
+        ; (async () => {
           const POLL_INTERVAL = 5000
           const MAX_POLLS = 60 // 5 minutes
 
@@ -658,7 +654,7 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
           }
         })()
       } else if (job.type === "image") {
-        ;(async () => {
+        ; (async () => {
           const POLL_INTERVAL = 5000
           const MAX_POLLS = 24 // 2 minutes
 
@@ -718,7 +714,7 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
         completedAt: new Date(),
       })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run once on mount
 
   const value = React.useMemo<GenerationQueueContextValue>(
