@@ -279,7 +279,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
               defaultEdgeOptions={{ type: "deletable", animated: true, markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } }}
               proOptions={{ hideAttribution: true }} className="workflow-canvas"
             >
-              <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
+              <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="var(--text-3)" />
               <Controls showInteractive={false} className="workflow-controls" />
               <MiniMap nodeColor={() => "#8b5cf6"} maskColor="rgba(0,0,0,0.3)" className="workflow-minimap" />
 

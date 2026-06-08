@@ -198,6 +198,7 @@ export async function POST(req: NextRequest) {
         const fallbackData = await fallbackResponse.json()
 
         if (!fallbackResponse.ok) {
+          console.error(`[image-generate] Fallback API error ${fallbackResponse.status}:`, fallbackData)
           // ── Refund on failure ──
           await refundCredits(session.user.id, creditCost, feature)
           return NextResponse.json(
@@ -211,6 +212,7 @@ export async function POST(req: NextRequest) {
 
       // Any other error
       if (!response.ok) {
+        console.error(`[image-generate] API error ${response.status}:`, data)
         // ── Refund on failure ──
         await refundCredits(session.user.id, creditCost, feature)
         return NextResponse.json(
