@@ -181,15 +181,15 @@ export async function POST(req: NextRequest) {
     if (endImage) basePayload.endImage = endImage
     if (voice) basePayload.voice = voice
 
-    // Attach replyUrl when running in production (not localhost)
-    const appUrl = process.env.NEXTAUTH_URL || ""
-    const isProduction = !appUrl.includes("localhost") && !appUrl.includes("127.0.0.1")
-    if (useAsync && isProduction) {
-      const secret = (process.env.NEXTAUTH_SECRET || "").slice(0, 16)
-      basePayload.replyUrl = `${appUrl.replace(/\/$/, "")}/api/ai/video-callback?secret=${encodeURIComponent(secret)}`
-      basePayload.replyRef = `jenna-${Date.now()}`
-      console.log(`[video-generate] replyUrl set: ${basePayload.replyUrl}`)
-    }
+    // User requested to disable webhook (replyUrl) and rely purely on polling for better UI/UX.
+    // const appUrl = process.env.NEXTAUTH_URL || ""
+    // const isProduction = !appUrl.includes("localhost") && !appUrl.includes("127.0.0.1")
+    // if (useAsync && isProduction) {
+    //   const secret = (process.env.NEXTAUTH_SECRET || "").slice(0, 16)
+    //   basePayload.replyUrl = `${appUrl.replace(/\/$/, "")}/api/ai/video-callback?secret=${encodeURIComponent(secret)}`
+    //   basePayload.replyRef = `jenna-${Date.now()}`
+    //   console.log(`[video-generate] replyUrl set: ${basePayload.replyUrl}`)
+    // }
 
     if (referenceImages && Array.isArray(referenceImages)) {
       referenceImages.forEach((ref: string, i: number) => {
