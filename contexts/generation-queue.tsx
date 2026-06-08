@@ -448,7 +448,9 @@ function submitVideoJobToStore(
             })
             .filter(Boolean)
 
-          if (videos.length === 0) throw new Error("Tidak ada video yang dihasilkan")
+          if (videos.length === 0) {
+            throw new Error(`DEBUG_JSON: ${JSON.stringify(pollData.media)}`)
+          }
 
           window.dispatchEvent(new CustomEvent("credits-updated"))
           updateJobInStore(id, {
