@@ -116,6 +116,15 @@ export async function POST(req: NextRequest) {
   // Extract media
   const media = extractMedia(body)
 
+  // Verify that the webhook payload actually contains videoUrl.
+  // Sometimes UseAPI webhook payloads are incomplete. If missing, we ignore it
+  // and let the client's polling endpoint fetch the full payload directly from UseAPI.
+  const hasValidVideo = media.some(m => m.videoUrl)
+  if (!hasValidVideo && status === "completed") {
+    console.warn(`[video-callback] Job ${jobId} webhook payload is missing videoUrl! Ignoring so client can poll directly.`)
+    return NextResponse.json({ ok: true })
+  }
+
   // Deduct credits using stored metadata
   let creditsDeducted = 0
   const deductKey = `cb:${jobId}`
