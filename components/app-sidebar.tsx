@@ -71,12 +71,12 @@ const navItems: NavItem[] = [
   //   icon: <BookOpenIcon className="h-4 w-4" />,
   //   type: "link",
   // },
-  // {
-  //   title: "WA Group Chat",
-  //   url: "https://chat.whatsapp.com/",
-  //   icon: <MessageCircleIcon className="h-4 w-4" />,
-  //   type: "external",
-  // },
+  {
+    title: "WA Group Chat",
+    url: "https://chat.whatsapp.com/DFOKpJMydEC8NIUtJ9Yl66",
+    icon: <MessageCircleIcon className="h-4 w-4" />,
+    type: "external",
+  },
 
   // ── Image Tools (collapsible) ──
   {

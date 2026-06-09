@@ -62,3 +62,12 @@ export function mediaUrlExpiryLabel(url: string, locale = "id-ID"): string | nul
   if (h > 0) return `Berlaku ${h}j ${m}m lagi`
   return `Berlaku ${m}m lagi`
 }
+
+/**
+ * Format internal model names to human readable names.
+ */
+export function formatModelName(model: string | null | undefined): string {
+  if (!model) return ""
+  if (model === "veo-3.1-lite-low-priority") return "Veo 3.1"
+  return model
+}

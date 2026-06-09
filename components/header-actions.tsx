@@ -23,7 +23,7 @@ import {
 } from "lucide-react"
 import { useGenerationQueue, type GenerationJob } from "@/contexts/generation-queue"
 import { useCredits } from "@/contexts/credits"
-import { cn } from "@/lib/utils"
+import { cn, formatModelName } from "@/lib/utils"
 import { downloadVideo, downloadImage } from "@/lib/download"
 import { VideoIcon } from "lucide-react"
 
@@ -343,7 +343,7 @@ function JobItem({
         <p className="text-xs font-medium text-foreground truncate">{job.prompt}</p>
         <div className="flex items-center gap-2 mt-0.5">
           {isVideo && <span className="text-[10px] text-blue-400">🎬 Video</span>}
-          <span className="text-[10px] text-muted-foreground">{job.model === "veo-3.1-lite-low-priority" ? "Veo 3.1" : job.model}</span>
+          <span className="text-[10px] text-muted-foreground">{formatModelName(job.model)}</span>
           <span className="text-[10px] text-muted-foreground/50">•</span>
           <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
@@ -501,7 +501,7 @@ function JobPreviewModal({ job, onClose }: { job: GenerationJob; onClose: () => 
       <div className="flex items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white/90 truncate">{job.prompt}</p>
-          <p className="text-[11px] text-white/50 mt-0.5">{job.model === "veo-3.1-lite-low-priority" ? "Veo 3.1" : job.model} • {itemCount} {isVideo ? "video" : "gambar"}</p>
+          <p className="text-[11px] text-white/50 mt-0.5">{formatModelName(job.model)} • {itemCount} {isVideo ? "video" : "gambar"}</p>
         </div>
         <button
           onClick={onClose}

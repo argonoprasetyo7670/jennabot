@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      background: #0f111a;
+      color: #e2e8f0;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 12px;
+    }
+    .header h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 600;
+      color: #fff;
+    }
+    .status-card {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .status-label {
+      color: #94a3b8;
+    }
+    .status-value {
+      font-family: monospace;
+      font-weight: 500;
+    }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge.connected { background: #10b98120; color: #10b981; border: 1px solid #10b98150; }
+    .badge.disconnected { background: #ef444420; color: #ef4444; border: 1px solid #ef444450; }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .stat-box {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .stat-value.success { color: #10b981; }
+    .stat-value.error { color: #ef4444; }
+    .stat-label {
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+    
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2563eb; }
+    button:active { background: #1d4ed8; }
+    button.secondary {
+      background: #334155;
+      color: #cbd5e1;
+    }
+    button.secondary:hover { background: #475569; }
+    
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .input-group label {
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+    input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+    button.save-btn {
+      padding: 8px 12px;
+      background: #10b981;
+    }
+    button.save-btn:hover { background: #059669; }
+    
+    .footer {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Jenna Bot Pro Captcha</h1>
+  </div>
+  
+  <div class="status-card">
+    <div class="status-row">
+      <span class="status-label">Status Broker</span>
+      <span id="conn-status" class="badge disconnected">Offline</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Worker ID</span>
+      <span id="worker-id" class="status-value">-</span>
+    </div>
+  </div>
+  
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div id="stat-done" class="stat-value success">0</div>
+      <div class="stat-label">Generated</div>
+    </div>
+    <div class="stat-box">
+      <div id="stat-fail" class="stat-value error">0</div>
+      <div class="stat-label">Failed</div>
+    </div>
+  </div>
+  
+  <div class="input-group">
+    <label>Broker Server URL</label>
+    <div class="input-row">
+      <input type="text" id="broker-url" placeholder="http://localhost:4000" />
+      <button id="btn-save-url" class="save-btn">Save</button>
+    </div>
+  </div>
+  
+  <div class="input-group">
+    <label>Last Generated Token</label>
+    <textarea id="last-token" rows="3" readonly style="background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px; border-radius: 6px; font-size: 11px; resize: none;" placeholder="Token will appear here..."></textarea>
+  </div>
+  
+  <div class="actions">
+    <button id="btn-reconnect" class="secondary">Reconnect to Broker</button>
+    <button id="btn-test">Test Generate Token</button>
+  </div>
+  
+  <div class="footer">
+    Pastikan tab labs.google tetap terbuka
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

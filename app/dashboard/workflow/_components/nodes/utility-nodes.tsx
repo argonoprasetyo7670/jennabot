@@ -524,26 +524,64 @@ export function VoiceNodeComponent({ data, id: nodeId }: NodeProps) {
 }
 
 /* ─── Text-to-Speech Node ─── */
+interface VoiceData {
+  voice_id: string
+  name: string
+  category: string
+  labels: Record<string, string>
+}
 export function TTSNodeComponent({ data, id: nodeId }: NodeProps) {
   const nd = data as Record<string, unknown>
   const { updateNodeData, deleteElements } = useReactFlow()
   const connectedPrompt = useConnectedValue("prompt") as string | null
   const [localText, setLocalText] = useState((nd._ttsText as string) || "")
-  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const activeText = connectedPrompt || localText
-  const voices = [{ id: "id-female", label: "Female — Indonesia", lang: "id-ID" }, { id: "id-male", label: "Male — Indonesia", lang: "id-ID" }, { id: "en-female", label: "Female — English", lang: "en-US" }, { id: "en-male", label: "Male — English", lang: "en-US" }]
-  const selectedVoice = (nd.voice as string) || "id-female"; const voiceObj = voices.find(v => v.id === selectedVoice)!
-  const handleSpeak = () => {
-    if (!activeText.trim()) return; window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(activeText); u.lang = voiceObj.lang; u.rate = 1.0
-    const av = window.speechSynthesis.getVoices(); const match = av.find(v => v.lang.startsWith(voiceObj.lang.split("-")[0])); if (match) u.voice = match
-    u.onstart = () => setIsSpeaking(true); u.onend = () => { setIsSpeaking(false); updateNodeData(nodeId, { status: "done", audio: `tts://${selectedVoice}`, _ttsText: activeText }) }
-    window.speechSynthesis.speak(u)
-  }
+  const [voices, setVoices] = useState<VoiceData[]>([])
+
   useEffect(() => {
-    if (activeText.trim()) updateNodeData(nodeId, { audio: `tts://${selectedVoice}`, _ttsText: activeText })
+    fetch("/api/ai/voices")
+      .then(r => r.json())
+      .then(d => { if (d.voices) setVoices(d.voices) })
+      .catch(console.error)
+  }, [])
+
+  // Default fallback voice (Adam)
+  const selectedVoice = (nd.voice as string) || "pNInz6obbf5AWCGq5RmY"
+
+  const handleGenerate = async () => {
+    if (!activeText.trim()) return
+    setIsGenerating(true)
+    updateNodeData(nodeId, { status: "running" })
+    try {
+      const res = await fetch("/api/ai/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: activeText.trim(), voiceId: selectedVoice }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Gagal generate audio")
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      updateNodeData(nodeId, { status: "done", audio: url, _audioUrl: url })
+    } catch (err) {
+      console.error(err)
+      alert(err instanceof Error ? err.message : "Gagal generate audio")
+      updateNodeData(nodeId, { status: "error" })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeText.trim()) updateNodeData(nodeId, { _ttsText: activeText, voice: selectedVoice })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeText, selectedVoice])
+
   return (
     <div className="relative">
       <NodeCloseBtn onClick={() => deleteElements({ nodes: [{ id: nodeId }] })} />
@@ -551,12 +589,21 @@ export function TTSNodeComponent({ data, id: nodeId }: NodeProps) {
         <HandleIcon icon={FileTextIcon} side="left" title="Input: Text" /><Handle type="target" position={Position.Left} id="prompt" style={{ background: getPortColor("prompt"), width: 10, height: 10, border: "2px solid var(--background)" }} />
         <HandleIcon icon={Volume2Icon} side="right" title="Output: Audio" /><Handle type="source" position={Position.Right} id="audio" style={{ background: getPortColor("audio"), width: 10, height: 10, border: "2px solid var(--background)" }} />
         <div className="space-y-2">
-          <select value={selectedVoice} onChange={e => updateNodeData(nodeId, { voice: e.target.value })} className="w-full rounded-lg border border-border bg-muted/20 px-2 py-1.5 text-xs text-foreground focus:outline-none">{voices.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}</select>
+          <select value={selectedVoice} onChange={e => updateNodeData(nodeId, { voice: e.target.value })} className="w-full rounded-lg border border-border bg-muted/20 px-2 py-1.5 text-[10px] text-foreground focus:outline-none">
+            {voices.length === 0 ? <option value={selectedVoice}>Memuat voices...</option> : voices.map(v => (
+              <option key={v.voice_id} value={v.voice_id}>{v.name} ({v.labels?.accent || "Default"})</option>
+            ))}
+          </select>
           <textarea value={connectedPrompt || localText} onChange={e => { if (!connectedPrompt) { setLocalText(e.target.value); updateNodeData(nodeId, { _ttsText: e.target.value }) } }} placeholder={connectedPrompt ? "Teks dari node..." : "Ketik teks..."} readOnly={!!connectedPrompt} rows={3} className="w-full rounded-xl border border-border bg-muted/20 px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-blue-400/50 resize-none" />
-          <button onClick={isSpeaking ? () => { window.speechSynthesis.cancel(); setIsSpeaking(false) } : handleSpeak} disabled={!activeText.trim()} className={cn("w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-40", isSpeaking ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-sm hover:shadow-md")}>
-            {isSpeaking ? <><div className="h-3 w-3 rounded-sm bg-red-400" /> Stop</> : <><Volume2Icon className="h-3.5 w-3.5" /> Play Preview</>}
+          <button onClick={handleGenerate} disabled={!activeText.trim() || isGenerating} className={cn("w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all active:scale-[0.98] disabled:opacity-40", isGenerating ? "bg-muted/50 text-muted-foreground border border-border" : "bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-sm hover:shadow-md")} title="Generate Audio">
+            {isGenerating ? <><Loader2Icon className="h-3.5 w-3.5 animate-spin" /> Generating...</> : <><Volume2Icon className="h-3.5 w-3.5" /> Generate Audio</>}
           </button>
-          <p className="text-[10px] text-muted-foreground/50 text-center">{activeText.length} karakter</p>
+          <p className="text-[10px] text-muted-foreground/50 text-center">{activeText.length} karakter (membutuhkan 3 kredit)</p>
+          {!!(nd._audioUrl || nd.audio) && (
+            <div className="mt-3 w-full rounded-lg border border-border bg-background/50 p-2">
+              <audio src={(nd._audioUrl as string) || (nd.audio as string)} controls className="h-8 w-full" />
+            </div>
+          )}
         </div>
       </NodeShell>
     </div>

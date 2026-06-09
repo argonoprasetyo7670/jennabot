@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { cn, isMediaUrlExpired, mediaUrlExpiryLabel } from "@/lib/utils"
+import { cn, isMediaUrlExpired, mediaUrlExpiryLabel, formatModelName } from "@/lib/utils"
 import { downloadMedia } from "@/lib/download"
 import { upscaleRunwayVideo } from "@/lib/api/runway-flow"
 import {
@@ -357,7 +357,7 @@ export default function GalleryPage() {
                               playsInline
                               preload="metadata"
                               onError={() => {}}
-                              onMouseOver={e => (e.target as HTMLVideoElement).play?.()}
+                              onMouseOver={e => (e.target as HTMLVideoElement).play?.()?.catch(() => {})}
                               onMouseOut={e => { const v = e.target as HTMLVideoElement; v.pause?.(); v.currentTime = 0 }}
                             />
                           )}
@@ -440,7 +440,7 @@ export default function GalleryPage() {
                           {item.model && (
                             <span className="flex items-center gap-0.5 text-[9px] text-violet-400 font-medium shrink-0">
                               <SparklesIcon className="h-2.5 w-2.5" />
-                              {item.model === "veo-3.1-lite-low-priority" ? "Veo 3.1" : item.model}
+                              {formatModelName(item.model)}
                             </span>
                           )}
                           {item.aspectRatio && (
@@ -498,7 +498,7 @@ export default function GalleryPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/90 truncate">{previewItem.prompt || "Untitled"}</p>
               <p className="text-[11px] text-white/50 mt-0.5">
-                {(previewItem.model === "veo-3.1-lite-low-priority" ? "Veo 3.1" : previewItem.model) || "Unknown"} • {previewItem.type === "video" ? "Video" : "Gambar"} • {formatDate(previewItem.createdAt)}
+                {formatModelName(previewItem.model) || "Unknown"} • {previewItem.type === "video" ? "Video" : "Gambar"} • {formatDate(previewItem.createdAt)}
               </p>
             </div>
             <button

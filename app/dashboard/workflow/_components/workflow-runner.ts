@@ -236,6 +236,40 @@ async function executeVideoGenNode(
   }
 }
 
+async function executeTTSNode(
+  node: Node,
+  inputs: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
+  const nd = node.data as Record<string, unknown>
+  const text = (inputs.prompt as string) || (nd._ttsText as string) || ""
+  const voiceId = (nd.voice as string) || "pNInz6obbf5AWCGq5RmY" // Default fallback voice
+  
+  if (!text.trim()) throw new Error("Teks kosong")
+  if (signal?.aborted) throw new Error("Dibatalkan")
+
+  const res = await fetch("/api/ai/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: text.trim(), voiceId }),
+    signal
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || "Gagal generate audio TTS")
+  }
+
+  const blob = await res.blob()
+  const audioUrl = URL.createObjectURL(blob)
+
+  return {
+    status: "done",
+    audio: audioUrl,
+    _audioUrl: audioUrl,
+  }
+}
+
 async function executeGalleryNode(
   node: Node,
   inputs: Record<string, unknown>
@@ -412,8 +446,11 @@ export async function runWorkflow(
         case "extendVideoNode":
           output = await executeExtendVideoNode(node, inputs, signal)
           break
+        case "ttsNode":
+          output = await executeTTSNode(node, inputs, signal)
+          break
         default:
-          // Pose, Camera, Voice, TTS, ImageGrid, ExtractFrame
+          // Pose, Camera, Voice, ImageGrid, ExtractFrame
           output = await executePassthroughNode(node, inputs)
           break
       }
@@ -445,6 +482,7 @@ export function estimateWorkflowCredits(nodes: Node[]): number {
     if (n.type === "imageGenNode") return sum + 1 * ((nd.count as number) || 1)
     if (n.type === "videoGenNode") return sum + 5
     if (n.type === "extendVideoNode") return sum + 5
+    if (n.type === "ttsNode") return sum + 3
     return sum
   }, 0)
 }

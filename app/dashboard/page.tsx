@@ -197,6 +197,12 @@ function featureLabel(feature: string | null): string {
   return feature ? (map[feature] || feature) : "—"
 }
 
+function formatModelName(model: string | null): string {
+  if (!model) return "—"
+  if (model === "veo-3.1-lite-low-priority") return "Veo 3.1"
+  return model
+}
+
 function statusBadge(status: string) {
   const colors: Record<string, string> = {
     settlement: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
@@ -356,7 +362,7 @@ function HistoryDialogContent({
                     <p className="text-sm font-medium truncate">{item.prompt || "Tanpa prompt"}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {item.model && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">{item.model}</Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">{formatModelName(item.model)}</Badge>
                       )}
                       {item.aspectRatio && (
                         <span className="text-[10px] text-muted-foreground">{item.aspectRatio}</span>

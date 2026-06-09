@@ -12,7 +12,7 @@ export const IMAGE_MODELS = [
 export type ImageModel = (typeof IMAGE_MODELS)[number]["value"]
 
 export const VIDEO_MODELS = [
-  { value: "veo-3.1-lite-low-priority", label: "Veo 3.1 Lite" },
+  { value: "veo-3.1-lite-low-priority", label: "Veo 3.1" },
 ] as const
 
 export type VideoModel = (typeof VIDEO_MODELS)[number]["value"]
