@@ -539,6 +539,15 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
             mediaGenerationId: img.mediaGenerationId || "",
             sourceAction: "image-generator",
           }),
+        }).then(res => res.json()).then(data => {
+          if (data.item?.gcsUrl) {
+            const currentStore = getStore()
+            const currentJob = currentStore.jobs.find(j => j.id === job.id)
+            if (currentJob && currentJob.images) {
+              const updatedImages = currentJob.images.map(i => i.url === img.url ? { ...i, url: data.item.gcsUrl } : i)
+              updateJobInStore(job.id, { images: updatedImages })
+            }
+          }
         }).catch(() => { })
       }
 
@@ -560,6 +569,19 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
             mediaGenerationId: (vid as any).mediaGenerationId || (vid as any).assetId || "",
             sourceAction: job.model?.includes("Seedance") ? "seedance-2" : job.model?.includes("Motion Control") ? "motion-control" : "video-generator",
           }),
+        }).then(res => res.json()).then(data => {
+          if (data.item?.gcsUrl) {
+            const currentStore = getStore()
+            const currentJob = currentStore.jobs.find(j => j.id === job.id)
+            if (currentJob && currentJob.videos) {
+              const updatedVideos = currentJob.videos.map(v => 
+                ((v as any).rawUrl || v.url) === storageUrl 
+                  ? { ...v, url: data.item.gcsUrl, rawUrl: data.item.gcsUrl } 
+                  : v
+              )
+              updateJobInStore(job.id, { videos: updatedVideos })
+            }
+          }
         }).catch(() => { })
       }
     }
