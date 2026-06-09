@@ -111,6 +111,8 @@ export function useImageGenerateNode(
         _selectedMediaId: result.images[0]?.mediaGenerationId || "",
         _selectedEmail: email || "",
         images: result.images.map(i => i.url),
+        mediaIds: result.images.map(i => i.mediaGenerationId || ""),
+        emails: result.images.map(() => email || ""),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal generate gambar")

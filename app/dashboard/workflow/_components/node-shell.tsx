@@ -15,6 +15,8 @@ export const PORT_COLORS: Record<string, string> = {
   selectedImage: "#34d399",
   images: "#34d399",
   references: "#34d399",
+  referenceImage: "#34d399",
+  mediaGenerationId: "#34d399",
   video: "#06b6d4",
   selectedVideo: "#06b6d4",
   videos: "#06b6d4",
@@ -25,7 +27,15 @@ export const PORT_COLORS: Record<string, string> = {
 }
 
 export function getPortColor(handle: string): string {
-  return PORT_COLORS[handle] || "#8b5cf6"
+  if (!handle) return "var(--border)"
+  if (PORT_COLORS[handle]) return PORT_COLORS[handle]
+  
+  const lid = handle.toLowerCase()
+  if (lid.includes("image")) return PORT_COLORS.image
+  if (lid.includes("video")) return PORT_COLORS.video
+  if (lid.includes("prompt")) return PORT_COLORS.prompt
+  
+  return "#8b5cf6"
 }
 
 /** Fetch a URL and convert to a File, for uploading connected reference images */
@@ -36,24 +46,28 @@ export async function urlToFile(url: string, filename = "reference.png"): Promis
 }
 
 /* ─── Base Node Wrapper — Clean card design ─── */
-export function NodeShell({ label, icon, status, nodeType, nodeId, children }: {
-  label: string
+export function NodeShell({ label, icon, status, nodeType, nodeId, headerActions, selected, children }: {
+  label: React.ReactNode
   icon: string
   status?: string
   /** Used to pick the correct Lottie loading label */
   nodeType?: string
   nodeId?: string
+  headerActions?: React.ReactNode
+  selected?: boolean
   children: React.ReactNode
 }) {
   const isRunning = status === "running"
 
   return (
     <div className={cn(
-      "workflow-node relative min-w-[280px] max-w-[340px] rounded-2xl border bg-card shadow-sm transition-all",
-      isRunning && "ring-2 ring-violet-400/60 shadow-violet-500/20 shadow-lg",
-      status === "done" && "ring-1 ring-emerald-500/40",
-      status === "error" && "ring-1 ring-red-500/40",
-      !status && "border-border/60 hover:shadow-md"
+      "workflow-node relative min-w-[280px] max-w-[340px] rounded-2xl border bg-card transition-all",
+      selected 
+        ? "border-violet-500/80 shadow-lg shadow-violet-500/10 ring-1 ring-violet-500/30" 
+        : (!status ? "border-border/60 shadow-sm hover:border-border hover:shadow-md" : "shadow-sm"),
+      isRunning && "ring-2 ring-violet-400/60 shadow-violet-500/20 shadow-lg border-violet-500/50",
+      status === "done" && "ring-1 ring-emerald-500/40 border-emerald-500/50",
+      status === "error" && "ring-1 ring-red-500/40 border-red-500/50"
     )}>
       {/* Lottie loading overlay — shown when node is running */}
       {isRunning && (
@@ -69,24 +83,11 @@ export function NodeShell({ label, icon, status, nodeType, nodeId, children }: {
         {isRunning && <Loader2Icon className="h-3.5 w-3.5 text-violet-400 animate-spin" />}
         {status === "done" && <CheckCircle2Icon className="h-3.5 w-3.5 text-emerald-400" />}
         {status === "error" && <AlertCircleIcon className="h-3.5 w-3.5 text-red-400" />}
+        {headerActions}
       </div>
       {/* Body */}
       <div className="px-3.5 pb-3 text-xs">
         {children}
-      </div>
-      {/* Bottom action bar */}
-      <div className="flex items-center justify-center gap-0.5 pb-2">
-        <div className="flex items-center gap-1 rounded-full bg-muted/50 border border-border/40 px-2 py-1">
-          <button className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition" title="Copy">
-            <CopyIcon className="h-3 w-3" />
-          </button>
-          <button className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition" title="Paste">
-            <ClipboardPasteIcon className="h-3 w-3" />
-          </button>
-          <button className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition" title="More">
-            <MoreHorizontalIcon className="h-3 w-3" />
-          </button>
-        </div>
       </div>
     </div>
   )

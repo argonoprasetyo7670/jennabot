@@ -486,7 +486,7 @@ html.light .marquee-track span { color: rgba(var(--fg-rgb), 0.15) !important; }
 }
 .workflow-canvas .react-flow__edge-path { stroke-width: 2; }
 .workflow-canvas .react-flow__handle {
-  border: 2px solid var(--bg) !important;
+  border: 2px solid var(--bg);
   transition: transform 0.2s ease;
 }
 .workflow-canvas .react-flow__handle:hover {

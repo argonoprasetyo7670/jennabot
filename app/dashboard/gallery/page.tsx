@@ -440,7 +440,7 @@ export default function GalleryPage() {
                           {item.model && (
                             <span className="flex items-center gap-0.5 text-[9px] text-violet-400 font-medium shrink-0">
                               <SparklesIcon className="h-2.5 w-2.5" />
-                              {item.model}
+                              {item.model === "veo-3.1-lite-low-priority" ? "Veo 3.1" : item.model}
                             </span>
                           )}
                           {item.aspectRatio && (
@@ -498,7 +498,7 @@ export default function GalleryPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/90 truncate">{previewItem.prompt || "Untitled"}</p>
               <p className="text-[11px] text-white/50 mt-0.5">
-                {previewItem.model || "Unknown"} • {previewItem.type === "video" ? "Video" : "Gambar"} • {formatDate(previewItem.createdAt)}
+                {(previewItem.model === "veo-3.1-lite-low-priority" ? "Veo 3.1" : previewItem.model) || "Unknown"} • {previewItem.type === "video" ? "Video" : "Gambar"} • {formatDate(previewItem.createdAt)}
               </p>
             </div>
             <button

@@ -147,7 +147,10 @@ export default function AIVideoGeneratorPage() {
         count: VIDEO_COUNTS[selectedCount],
       },
       imageMode === "reference" && refs.length > 0 ? refs : undefined,
-      imageMode === "start" && refs.length > 0 ? { startImage: refs[0] } : undefined
+      imageMode === "start" ? {
+        startImage: refs[0],
+        endImage: refs[1]
+      } : undefined
     )
 
     setActiveJobId(jobId)
@@ -180,7 +183,7 @@ export default function AIVideoGeneratorPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    const maxRefs = 3
+    const maxRefs = imageMode === "start" ? 2 : 3
     const remaining = maxRefs - referenceImages.length
     const newRefs: ReferenceImage[] = files.slice(0, remaining).map((file) => ({
       file,
@@ -234,7 +237,8 @@ export default function AIVideoGeneratorPage() {
   }
 
   const selectGalleryItem = (item: GalleryItem) => {
-    if (referenceImages.length >= 3) return
+    const maxRefs = imageMode === "start" ? 2 : 3
+    if (referenceImages.length >= maxRefs) return
     setReferenceImages((prev) => [
       ...prev,
       { preview: item.gcsUrl, galleryUrl: item.gcsUrl, fromGallery: true },
@@ -398,9 +402,14 @@ export default function AIVideoGeneratorPage() {
                         <span className="text-[7px] text-white/70">Gallery</span>
                       </div>
                     )}
+                    {imageMode === "start" && (
+                      <div className="absolute top-0 inset-x-0 bg-black/50 text-center">
+                        <span className="text-[8px] font-medium text-white/90">{i === 0 ? "Start" : "End"}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
-                {referenceImages.length < 3 && (
+                {referenceImages.length < (imageMode === "start" ? 2 : 3) && (
                   <button onClick={() => setShowPlusMenu(true)} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground/40 transition hover:border-border hover:text-muted-foreground">
                     <PlusIcon className="h-4 w-4" />
                   </button>

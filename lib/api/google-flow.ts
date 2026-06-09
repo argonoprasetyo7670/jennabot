@@ -394,3 +394,76 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
 
   throw new Error("Video generation timed out after 5 minutes")
 }
+
+/* ─── Video Extension ─── */
+
+export interface ExtendVideoParams {
+  mediaGenerationId: string
+  prompt: string
+  model?: VideoModel
+  count?: number
+  seed?: number
+}
+
+export interface ExtendVideoResult {
+  jobId: string
+  videos: GeneratedVideo[]
+}
+
+/**
+ * Extend a previously generated video using UseAPI's /videos/extend endpoint.
+ * Takes the mediaGenerationId from a previous video and a prompt describing what happens next.
+ * Returns an 8-second extension that continues from the last ~1 second of the source video.
+ */
+export async function extendVideo(params: ExtendVideoParams): Promise<ExtendVideoResult> {
+  if (!params.mediaGenerationId) {
+    throw new Error("mediaGenerationId is required")
+  }
+  if (!params.prompt?.trim()) {
+    throw new Error("Prompt is required")
+  }
+
+  const res = await fetch("/api/ai/video-extend", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mediaGenerationId: params.mediaGenerationId,
+      prompt: params.prompt.trim(),
+      model: params.model || "veo-3.1-lite-low-priority",
+      count: params.count || 1,
+      seed: params.seed,
+    }),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : data.error?.message || `Extend failed (${res.status})`
+    )
+  }
+
+  const videos: GeneratedVideo[] = (data.media || [])
+    .map((m: Record<string, unknown>) => {
+      const videoUrl = m.videoUrl as string | undefined
+      if (!videoUrl) return null
+      const gen = (m.video as Record<string, unknown>)?.generatedVideo as Record<string, unknown> | undefined
+      const proxyUrl = `/api/ai/video-download?url=${encodeURIComponent(videoUrl)}&mode=inline`
+      return {
+        url: proxyUrl,
+        rawUrl: videoUrl,
+        thumbnailUrl: m.thumbnailUrl as string | undefined,
+        seed: gen?.seed as number | undefined,
+        mediaGenerationId: m.mediaGenerationId as string | undefined,
+        model: gen?.model as string | undefined,
+        aspectRatio: gen?.aspectRatio as string | undefined,
+        prompt: gen?.prompt as string | undefined,
+      }
+    })
+    .filter(Boolean) as GeneratedVideo[]
+
+  if (videos.length === 0) {
+    throw new Error("Video extension failed. Try a different prompt.")
+  }
+
+  return { jobId: data.jobId || "", videos }
+}

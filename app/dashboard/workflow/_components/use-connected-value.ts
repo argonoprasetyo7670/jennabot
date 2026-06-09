@@ -13,7 +13,28 @@ export function useConnectedValue(targetHandle: string, sourceHandle?: string): 
   const sourceNode = nodes.find(n => n.id === incomingEdge.source)
   if (!sourceNode) return null
   const key = sourceHandle || incomingEdge.sourceHandle || targetHandle
-  return (sourceNode.data as Record<string, unknown>)[key] ?? null
+  let value = (sourceNode.data as Record<string, unknown>)[key] ?? null
+
+  // Intercept indexed image handles (e.g., from Image Gen's multi-outputs)
+  const match = incomingEdge.sourceHandle?.match(/^image_(\d+)$/)
+  const isSelectedImageHandle = incomingEdge.sourceHandle === "selectedImage"
+  
+  if (match || isSelectedImageHandle) {
+    const idx = isSelectedImageHandle ? 0 : Number(match![1])
+    const data = sourceNode.data as Record<string, unknown>
+    if (key === "_selectedMediaId" || key === "mediaGenerationId") {
+      const arr = data.mediaIds as string[]
+      if (arr && arr[idx] !== undefined) value = arr[idx]
+    } else if (key === "selectedImage" || key === "image") {
+      const arr = data.images as string[]
+      if (arr && arr[idx] !== undefined) value = arr[idx]
+    } else if (key === "_selectedEmail" || key === "email") {
+      const arr = data.emails as string[]
+      if (arr && arr[idx] !== undefined) value = arr[idx]
+    }
+  }
+
+  return value
 }
 
 /**
@@ -24,7 +45,7 @@ export function useConnectedValue(targetHandle: string, sourceHandle?: string): 
 export function useAllConnectedValues(
   targetHandle: string,
   sourceHandle?: string
-): { nodeId: string; value: unknown }[] {
+): { nodeId: string; value: unknown; _uploadEmail?: unknown }[] {
   const nodeId = useNodeId()
   const nodes = useNodes()
   const edges = useEdges()
@@ -36,10 +57,30 @@ export function useAllConnectedValues(
       const sourceNode = nodes.find(n => n.id === e.source)
       if (!sourceNode) return null
       const key = sourceHandle || e.sourceHandle || targetHandle
-      const value = (sourceNode.data as Record<string, unknown>)[key] ?? null
-      return { nodeId: e.source, value }
+      
+      let value = (sourceNode.data as Record<string, unknown>)[key] ?? null
+      let uploadEmail = sourceNode.data["_uploadEmail"] ?? null
+
+      const match = e.sourceHandle?.match(/^image_(\d+)$/)
+      const isSelectedImageHandle = e.sourceHandle === "selectedImage"
+      
+      if (match || isSelectedImageHandle) {
+        const idx = isSelectedImageHandle ? 0 : Number(match![1])
+        const data = sourceNode.data as Record<string, unknown>
+        if (key === "_selectedMediaId" || key === "mediaGenerationId") {
+          const arr = data.mediaIds as string[]
+          if (arr && arr[idx] !== undefined) value = arr[idx]
+        } else if (key === "selectedImage" || key === "image") {
+          const arr = data.images as string[]
+          if (arr && arr[idx] !== undefined) value = arr[idx]
+        }
+        const emailArr = data.emails as string[]
+        if (emailArr && emailArr[idx] !== undefined) uploadEmail = emailArr[idx]
+      }
+
+      return { nodeId: e.source, value, _uploadEmail: uploadEmail }
     })
-    .filter(Boolean) as { nodeId: string; value: unknown }[]
+    .filter(Boolean) as { nodeId: string; value: unknown; _uploadEmail?: unknown }[]
 }
 
 /** Shorthand: read the "prompt" input from a connected Prompt node */

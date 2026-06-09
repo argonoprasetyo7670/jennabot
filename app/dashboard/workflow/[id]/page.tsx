@@ -9,6 +9,7 @@ import {
   addEdge, useNodesState, useEdgesState,
   type Connection, type Node, type Edge,
   BackgroundVariant, MarkerType,
+  type ConnectionLineComponentProps, getBezierPath,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import {
@@ -27,6 +28,17 @@ import { nodeTypes, PALETTE_ITEMS, AgentInputBox } from "../_components/node-reg
 import { DeletableEdge } from "../_components/deletable-edge"
 
 const edgeTypes = { deletable: DeletableEdge }
+
+function CustomConnectionLine({ fromX, fromY, toX, toY, fromPosition, toPosition, fromHandle }: ConnectionLineComponentProps) {
+  const [edgePath] = getBezierPath({ sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition, targetX: toX, targetY: toY, targetPosition: toPosition })
+  const color = getPortColor(fromHandle?.id || "")
+  return (
+    <g>
+      <path fill="none" stroke={color} strokeWidth={2.5} d={edgePath} strokeDasharray="5,5" className="animate-pulse" />
+      <circle cx={toX} cy={toY} fill={color} r={5} stroke={color} strokeWidth={1.5} />
+    </g>
+  )
+}
 
 export default function WorkflowEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -277,6 +289,7 @@ export default function WorkflowEditorPage({ params }: { params: Promise<{ id: s
               fitView snapToGrid snapGrid={[16, 16]}
               panOnDrag={activeTool === "grab"} selectionOnDrag={activeTool === "select"}
               defaultEdgeOptions={{ type: "deletable", animated: true, markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 } }}
+              connectionLineComponent={CustomConnectionLine}
               proOptions={{ hideAttribution: true }} className="workflow-canvas"
             >
               <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="var(--text-3)" />

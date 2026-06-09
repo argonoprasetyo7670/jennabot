@@ -30,9 +30,11 @@ export function useVideoGenerateNode(
   nodeId: string,
   nodeData: Record<string, unknown>,
   activePrompt: string,
-  connectedImage: string | null,   // display URL (for preview)
-  connectedMediaId: string | null = null, // mediaGenerationId for API
-  connectedEmail: string | null = null,   // email to pin Google account
+  connectedImage: string | null,
+  connectedMediaId: string | null,
+  connectedEndMediaId: string | null,
+  connectedEmail: string | null = null,
+  imageMode: string = "start",
 ): UseVideoGenerateNodeReturn {
   const { updateNodeData } = useReactFlow()
 
@@ -64,21 +66,29 @@ export function useVideoGenerateNode(
       const duration = (nodeData.duration as string) || DEFAULTS.videoDuration
 
       // startImage MUST be a mediaGenerationId, not a URL
-      // Priority: upstream _selectedMediaId → nodeData preloaded → undefined
       const startImageId = connectedMediaId
         || (nodeData._startImageMediaId as string)
+        || undefined
+
+      const endImageId = connectedEndMediaId
         || undefined
 
       const email = connectedEmail
         || (nodeData._startImageEmail as string)
         || undefined
 
+      // Assets/reference mode → referenceImages (supports 8s)
+      // Frame/start mode → startImage (I2V, may cap at 4s on lite)
+      const isReferenceMode = imageMode === "reference"
+
       const result = await generateVideos({
         prompt: activePrompt.trim(),
         model: model as "veo-3.1-lite-low-priority",
         aspectRatio: toVideoAspect(aspectRatio),
         duration: toDurationSeconds(duration) as 8,
-        ...(startImageId ? { startImage: startImageId } : {}),
+        ...(startImageId && !isReferenceMode ? { startImage: startImageId } : {}),
+        ...(endImageId && !isReferenceMode ? { endImage: endImageId } : {}),
+        ...(startImageId && isReferenceMode ? { referenceImages: [startImageId] } : {}),
         ...(email ? { email } : {}),
       })
 
@@ -88,6 +98,8 @@ export function useVideoGenerateNode(
         _videoUrl: vid?.url || "",
         _rawVideoUrl: vid?.rawUrl || "",
         selectedVideo: vid?.url || "",
+        _videoMediaId: vid?.mediaGenerationId || "",
+        mediaGenerationId: vid?.mediaGenerationId || "",
         videos: result.videos.map(v => v.url),
       })
     } catch (err) {

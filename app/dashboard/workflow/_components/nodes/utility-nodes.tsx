@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Handle, Position, useReactFlow } from "@xyflow/react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { Handle, Position, useReactFlow, useEdges } from "@xyflow/react"
 import type { NodeProps } from "@xyflow/react"
 import {
   VideoIcon, ImageIcon, LayoutGridIcon, Loader2Icon, PlayIcon,
   RefreshCwIcon, XIcon, UploadIcon, ScissorsIcon, UserIcon,
   SlidersHorizontalIcon, MicIcon, Volume2Icon, FileTextIcon,
-  CheckCircle2Icon, AlertCircleIcon,
+  CheckCircle2Icon, AlertCircleIcon, MoreHorizontalIcon, PencilIcon, CopyIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NodeShell, NodeCloseBtn, HandleIcon, getPortColor } from "../node-shell"
@@ -20,49 +20,101 @@ export function ExtendVideoNodeComponent({ data, id: nodeId }: NodeProps) {
   const { updateNodeData, deleteElements } = useReactFlow()
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [elapsed, setElapsed] = useState(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Read connected values
+  const connectedPrompt = useConnectedValue("prompt") as string | null
   const connectedVideo = useConnectedValue("video") as string | null
+  const connectedMediaId = useConnectedValue("video", "_videoMediaId") as string | null
+  const connectedMediaIdAlt = useConnectedValue("video", "mediaGenerationId") as string | null
+  const mediaId = connectedMediaId || connectedMediaIdAlt || (nd._sourceMediaId as string) || null
+
+  // Check if edges exist (separate from data)
+  const edges = useEdges()
+  const hasVideoEdge = edges.some(e => e.target === nodeId && e.targetHandle === "video")
+  const hasPromptEdge = edges.some(e => e.target === nodeId && e.targetHandle === "prompt")
+
+  // Determine effective prompt: connected prompt overrides local
+  const effectivePrompt = connectedPrompt || (nd._extendPrompt as string) || ""
+
   const resultUrl = nd._resultUrl as string | undefined
 
   const handleExtend = async () => {
-    if (!connectedVideo) { setError("Hubungkan video terlebih dahulu"); return }
-    setIsProcessing(true); setError(null); updateNodeData(nodeId, { status: "running" })
+    if (!mediaId) { setError("Video belum di-generate. Generate video dulu, lalu extend."); return }
+    const prompt = effectivePrompt.trim() || "Continue the video naturally with smooth motion"
+
+    setIsProcessing(true); setError(null); setElapsed(0)
+    updateNodeData(nodeId, { status: "running", _resultUrl: undefined, _resultMediaId: undefined })
+    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+
     try {
-      const video = document.createElement("video"); video.crossOrigin = "anonymous"; video.src = connectedVideo
-      await new Promise<void>((res, rej) => { video.onloadedmetadata = () => res(); video.onerror = () => rej(new Error("Gagal load video")) })
-      video.currentTime = Math.max(0, video.duration - 0.1)
-      await new Promise<void>(res => { video.onseeked = () => res() })
-      const canvas = document.createElement("canvas"); canvas.width = video.videoWidth; canvas.height = video.videoHeight
-      canvas.getContext("2d")!.drawImage(video, 0, 0)
-      const blob = await (await fetch(canvas.toDataURL("image/jpeg", 0.9))).blob()
-      const file = new File([blob], "last-frame.jpg", { type: "image/jpeg" })
-      const { uploadImageAsset: upload, generateVideos } = await import("@/lib/api/google-flow")
-      const asset = await upload(file)
-      const prompt = (nd._extendPrompt as string) || "Continue the video naturally with smooth motion"
-      const result = await generateVideos({ prompt, model: DEFAULTS.videoModel as "veo-3.1-lite-low-priority", aspectRatio: "landscape", duration: toDurationSeconds((nd.extendDuration as string) || "8s") as 4 | 8, startImage: asset.mediaGenerationId, email: asset.email })
-      const videoUrl = result.videos[0]?.url || ""
-      updateNodeData(nodeId, { status: "done", selectedVideo: videoUrl, _resultUrl: videoUrl })
+      const { extendVideo } = await import("@/lib/api/google-flow")
+      const result = await extendVideo({
+        mediaGenerationId: mediaId,
+        prompt,
+        model: (nd.extendModel as "veo-3.1-lite-low-priority") || undefined,
+      })
+
+      const vid = result.videos[0]
+      updateNodeData(nodeId, {
+        status: "done",
+        selectedVideo: vid?.url || "",
+        _resultUrl: vid?.url || "",
+        _rawVideoUrl: vid?.rawUrl || "",
+        _resultMediaId: vid?.mediaGenerationId || "",
+        _videoMediaId: vid?.mediaGenerationId || "",
+        mediaGenerationId: vid?.mediaGenerationId || "",
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal extend video"); updateNodeData(nodeId, { status: "error" })
-    } finally { setIsProcessing(false) }
+      setError(err instanceof Error ? err.message : "Gagal extend video")
+      updateNodeData(nodeId, { status: "error" })
+    } finally {
+      setIsProcessing(false)
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
   }
+
+  const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`
 
   return (
     <div className="relative">
       <NodeCloseBtn onClick={() => deleteElements({ nodes: [{ id: nodeId }] })} />
       <NodeShell label="Extend Video" icon="🔄" status={(nd._runStatus || nd.status) as string} nodeId={nodeId}>
-        <HandleIcon icon={VideoIcon} side="left" title="Input: Video" />
-        <Handle type="target" position={Position.Left} id="video" style={{ background: getPortColor("video"), width: 10, height: 10, border: "2px solid var(--background)" }} />
-        <HandleIcon icon={LayoutGridIcon} side="right" title="Output: Extended Video" />
-        <Handle type="source" position={Position.Right} id="selectedVideo" style={{ background: getPortColor("selectedVideo"), width: 10, height: 10, border: "2px solid var(--background)" }} />
+        {/* Input: Prompt (pink) */}
+        <Handle type="target" position={Position.Left} id="prompt"
+          className="!border-[4px] !border-[#f472b6] !left-[-8px]"
+          style={{ width: 16, height: 16, background: "var(--card)", top: "25%", zIndex: 10 }} />
+        {/* Input: Video (cyan) */}
+        <Handle type="target" position={Position.Left} id="video"
+          className="!border-[4px] !border-[#06b6d4] !left-[-8px]"
+          style={{ width: 16, height: 16, background: "var(--card)", top: "55%", zIndex: 10 }} />
+        {/* Output: Extended Video (cyan) */}
+        <Handle type="source" position={Position.Right} id="selectedVideo"
+          className="!border-[4px] !border-[#06b6d4] !right-[-8px]"
+          style={{ width: 16, height: 16, background: "var(--card)", top: "40%", zIndex: 10 }} />
+
+        {/* Preview */}
         <div className="relative w-full aspect-video rounded-xl border border-border bg-muted/20 overflow-hidden mb-2">
           {resultUrl ? <video src={resultUrl} className="w-full h-full object-cover" muted controls />
-            : isProcessing ? <div className="flex flex-col items-center justify-center h-full gap-2"><Loader2Icon className="h-6 w-6 text-cyan-400 animate-spin" /><p className="text-[10px] text-muted-foreground">Extending...</p></div>
-              : <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/40"><RefreshCwIcon className="h-6 w-6" /><p className="text-[10px]">{connectedVideo ? "Ready" : "Connect video"}</p></div>}
+            : isProcessing ? <div className="flex flex-col items-center justify-center h-full gap-2"><Loader2Icon className="h-6 w-6 text-cyan-400 animate-spin" /><p className="text-[10px] text-muted-foreground">Extending... {fmtTime(elapsed)}</p></div>
+              : <div className="flex flex-col items-center justify-center h-full gap-1 text-muted-foreground/40"><RefreshCwIcon className="h-6 w-6" /><p className="text-[10px]">{mediaId ? "✅ Ready to extend" : hasVideoEdge ? "⏳ Generate video dulu" : "Connect video"}</p></div>}
         </div>
-        <textarea value={(nd._extendPrompt as string) || ""} onChange={e => updateNodeData(nodeId, { _extendPrompt: e.target.value })} placeholder="Deskripsi kelanjutan video..." rows={2} className="w-full rounded-xl border border-border bg-muted/20 px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-blue-400/50 resize-none mb-2" />
+
+        {/* Source info */}
+        {mediaId && !isProcessing && (
+          <div className="flex items-center gap-1.5 rounded-lg bg-cyan-500/8 border border-cyan-500/20 px-2 py-1 mb-2">
+            <VideoIcon className="h-3 w-3 text-cyan-400 shrink-0" />
+            <p className="text-[9px] text-cyan-400 truncate">ID: ...{mediaId.slice(-20)}</p>
+          </div>
+        )}
+
+        {/* Prompt */}
+        <textarea value={connectedPrompt || (nd._extendPrompt as string) || ""} onChange={e => { if (!connectedPrompt) updateNodeData(nodeId, { _extendPrompt: e.target.value }) }} readOnly={!!connectedPrompt} placeholder={hasPromptEdge ? "Prompt dari node..." : "Deskripsi kelanjutan video..."} rows={2} className={cn("w-full rounded-xl border border-border bg-muted/20 px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 resize-none mb-2", connectedPrompt && "bg-pink-500/5 border-pink-500/20")} />
+
+        {/* Actions */}
         <div className="flex items-center gap-2 mb-1">
-          <select value={(nd.extendDuration as string) || "8s"} onChange={e => updateNodeData(nodeId, { extendDuration: e.target.value })} className="flex-1 rounded-lg border border-border bg-muted/20 px-2 py-1.5 text-xs text-foreground focus:outline-none"><option value="5s">+5 detik</option><option value="8s">+8 detik</option></select>
-          <button onClick={handleExtend} disabled={isProcessing || !connectedVideo} className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:shadow-md transition active:scale-95">{isProcessing ? <Loader2Icon className="h-3 w-3 animate-spin" /> : <PlayIcon className="h-3 w-3" />} Extend</button>
+          <button onClick={handleExtend} disabled={isProcessing || !mediaId} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:shadow-md transition active:scale-95">{isProcessing ? <Loader2Icon className="h-3 w-3 animate-spin" /> : <PlayIcon className="h-3 w-3" />} Extend +8s</button>
         </div>
         {error && <p className="text-[10px] text-red-400 mt-1">{error}</p>}
       </NodeShell>
@@ -70,10 +122,11 @@ export function ExtendVideoNodeComponent({ data, id: nodeId }: NodeProps) {
   )
 }
 
+
 /* ─── Upload Node ─── */
-export function UploadNodeComponent({ data, id: nodeId }: NodeProps) {
+export function UploadNodeComponent({ data, id: nodeId, selected }: NodeProps) {
   const nd = data as Record<string, unknown>
-  const { updateNodeData, deleteElements } = useReactFlow()
+  const { updateNodeData, deleteElements, getNodes, setNodes } = useReactFlow()
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>((nd._preview as string) || null)
   const [fileType, setFileType] = useState<"image" | "video">((nd._fileType as "image" | "video") || "image")
@@ -81,6 +134,41 @@ export function UploadNodeComponent({ data, id: nodeId }: NodeProps) {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const uploadedId = nd.mediaGenerationId as string | undefined
   const uploadedEmail = nd._uploadEmail as string | undefined
+
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const title = (nd.title as string) || "Upload Media"
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [menuOpen])
+
+  const handleDuplicate = useCallback(() => {
+    setMenuOpen(false)
+    const nodes = getNodes()
+    const currentNode = nodes.find(n => n.id === nodeId)
+    if (!currentNode) return
+    const newId = `upload_${Date.now()}`
+    const newNode = {
+      ...currentNode,
+      id: newId,
+      position: { x: currentNode.position.x + 40, y: currentNode.position.y + 40 },
+      data: { ...currentNode.data, title: `${title} (copy)` },
+      selected: false,
+    }
+    setNodes([...nodes, newNode])
+  }, [getNodes, setNodes, nodeId, title])
+
+  const handleRename = useCallback(() => {
+    setMenuOpen(false)
+    setIsEditingTitle(true)
+  }, [])
 
   const handleFile = async (file: File) => {
     const isVideo = file.type.startsWith("video/")
@@ -122,15 +210,65 @@ export function UploadNodeComponent({ data, id: nodeId }: NodeProps) {
     }
   }
 
+  const headerActions = (
+    <div className="relative" ref={menuRef}>
+      <button 
+        onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
+        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition"
+      >
+        <MoreHorizontalIcon className="h-4 w-4" />
+      </button>
+      {menuOpen && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-border bg-card shadow-lg overflow-hidden animate-fade-in p-1 cursor-default" onClick={e => e.stopPropagation()}>
+          <button onClick={handleRename} className="flex w-full items-center gap-2 px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/50 rounded-lg transition">
+            <PencilIcon className="h-3 w-3" /> Rename
+          </button>
+          <button onClick={handleDuplicate} className="flex w-full items-center gap-2 px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/50 rounded-lg transition">
+            <CopyIcon className="h-3 w-3" /> Duplicate
+          </button>
+          <div className="h-px bg-border/50 my-1 mx-1" />
+          <button onClick={() => { deleteElements({ nodes: [{ id: nodeId }] }); setMenuOpen(false) }} className="flex w-full items-center gap-2 px-2 py-1.5 text-[11px] font-medium text-red-400 hover:bg-red-500/10 rounded-lg transition">
+            <XIcon className="h-3 w-3" /> Hapus Node
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
   return (
-    <div className="relative">
-      <NodeCloseBtn onClick={() => deleteElements({ nodes: [{ id: nodeId }] })} />
-      <NodeShell label="Upload" icon="⬆️" nodeType="uploadNode" status={(nd._runStatus || nd.status) as string} nodeId={nodeId}>
-        <HandleIcon icon={ImageIcon} side="right" top="28%" title="Output: Image URL" />
-        <Handle type="source" position={Position.Right} id="selectedImage" style={{ background: getPortColor("selectedImage"), width: 10, height: 10, border: "2px solid var(--background)", top: "28%" }} />
-        <Handle type="source" position={Position.Right} id="selectedVideo" style={{ background: getPortColor("selectedVideo"), width: 10, height: 10, border: "2px solid var(--background)", top: "52%" }} />
-        <HandleIcon icon={LayoutGridIcon} side="right" top="74%" title="Output: mediaGenerationId (sambungkan ke references)" />
-        <Handle type="source" position={Position.Right} id="mediaGenerationId" style={{ background: getPortColor("references"), width: 10, height: 10, border: "2px solid var(--background)", top: "74%" }} />
+    <div className="relative group">
+      <NodeShell 
+        label={isEditingTitle ? (
+          <input
+            autoFocus
+            type="text"
+            value={title}
+            onChange={e => updateNodeData(nodeId, { title: e.target.value })}
+            onBlur={() => setIsEditingTitle(false)}
+            onKeyDown={e => e.key === "Enter" && setIsEditingTitle(false)}
+            className="bg-transparent text-sm font-medium text-foreground focus:outline-none border-b border-border w-full"
+          />
+        ) : (
+          <span className="cursor-text" onClick={() => setIsEditingTitle(true)} title="Klik untuk mengubah nama">{title}</span>
+        )} 
+        icon="⬆️" 
+        nodeType="uploadNode" 
+        status={(nd._runStatus || nd.status) as string} 
+        nodeId={nodeId}
+        headerActions={headerActions}
+        selected={selected}
+      >
+        {/* ─── Right Handle: Image (Frame URL) ─── */}
+        <span className={cn("absolute left-full ml-5 whitespace-nowrap text-[10px] font-medium text-[#34d399] pointer-events-none select-none transition-opacity duration-200", selected ? "opacity-100" : "opacity-0 group-hover:opacity-100")} style={{ top: "30%", transform: "translateY(-50%)" }}>Image</span>
+        <Handle type="source" position={Position.Right} id="selectedImage" className="!border-[4px] !border-[#34d399]" style={{ width: 16, height: 16, background: "var(--card)", right: -8, top: "30%", zIndex: 10 }} />
+        
+        {/* ─── Right Handle: Video (URL) ─── */}
+        <span className={cn("absolute left-full ml-5 whitespace-nowrap text-[10px] font-medium text-[#06b6d4] pointer-events-none select-none transition-opacity duration-200", selected ? "opacity-100" : "opacity-0 group-hover:opacity-100")} style={{ top: "50%", transform: "translateY(-50%)" }}>Video</span>
+        <Handle type="source" position={Position.Right} id="selectedVideo" className="!border-[4px] !border-[#06b6d4]" style={{ width: 16, height: 16, background: "var(--card)", right: -8, top: "50%", zIndex: 10 }} />
+        
+        {/* ─── Right Handle: Asset Reference (ID) ─── */}
+        <span className={cn("absolute left-full ml-5 whitespace-nowrap text-[10px] font-medium text-[#34d399] pointer-events-none select-none transition-opacity duration-200", selected ? "opacity-100" : "opacity-0 group-hover:opacity-100")} style={{ top: "70%", transform: "translateY(-50%)" }}>Asset Ref</span>
+        <Handle type="source" position={Position.Right} id="mediaGenerationId" className="!border-[4px] !border-[#34d399]" style={{ width: 16, height: 16, background: "var(--card)", right: -8, top: "70%", zIndex: 10 }} />
 
         <div
           onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
