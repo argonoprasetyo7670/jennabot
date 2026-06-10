@@ -81,6 +81,9 @@ export async function POST(req: NextRequest) {
     // Save to gallery
     const galleryId = crypto.randomUUID()
     const gcsPath = `gallery/${userId}/${galleryId}`
+    // Use artifact assetId (user:...-asset:...) for mediaGenerationId, NOT taskId
+    // This is required by the upscale API which expects a videoAssetId
+    const videoAssetId = video?.assetId || video?.id || taskId
     await prisma.gallery_items.create({
       data: {
         id: galleryId,
@@ -91,7 +94,7 @@ export async function POST(req: NextRequest) {
         prompt: meta.prompt || null,
         model: meta.model || "runway",
         aspectRatio: meta.aspectRatio || null,
-        mediaGenerationId: taskId,
+        mediaGenerationId: videoAssetId,
         sourceAction: feature,
         expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
         updatedAt: new Date(),

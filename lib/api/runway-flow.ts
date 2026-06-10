@@ -101,9 +101,9 @@ export async function uploadRunwayAsset(
   }
 
   return {
-    assetId: data.assetId,
-    url: data.url,
-    mediaType: data.mediaType,
+    assetId: data.assetId as string,
+    url: data.url as string,
+    mediaType: data.mediaType as string,
   }
 }
 
@@ -142,7 +142,7 @@ export async function generateRunwayVideo(
     )
   }
 
-  const taskId = startData.taskId
+  const taskId = startData.taskId as string
   if (!taskId) {
     throw new Error("No taskId returned from server")
   }

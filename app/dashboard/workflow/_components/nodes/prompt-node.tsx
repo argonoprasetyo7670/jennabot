@@ -11,7 +11,7 @@ export function PromptNodeComponent({ data, id: nodeId, selected }: NodeProps) {
   const { updateNodeData, deleteElements, getNodes, setNodes } = useReactFlow()
   const nodeData = data as Record<string, unknown>
   const promptText = (nodeData.prompt as string) || ""
-  const title = (nodeData.title as string) ?? "Styles"
+  const title = (nodeData.title as string) ?? "Prompt"
 
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)

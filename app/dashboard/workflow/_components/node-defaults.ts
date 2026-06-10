@@ -35,6 +35,6 @@ export function toVideoAspect(ar: string): "landscape" | "portrait" {
 }
 
 /** Map duration string → UseAPI numeric seconds param */
-export function toDurationSeconds(dur: string): 4 | 8 {
-  return dur === "5s" ? 4 : 8
+export function toDurationSeconds(dur: string): 8 | 8 {
+  return dur === "5s" ? 8 : 8
 }
