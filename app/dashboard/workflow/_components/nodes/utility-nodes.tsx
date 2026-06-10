@@ -8,6 +8,7 @@ import {
   RefreshCwIcon, XIcon, UploadIcon, ScissorsIcon, UserIcon,
   SlidersHorizontalIcon, MicIcon, Volume2Icon, FileTextIcon,
   CheckCircle2Icon, AlertCircleIcon, MoreHorizontalIcon, PencilIcon, CopyIcon,
+  LinkIcon, DownloadIcon
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NodeShell, NodeCloseBtn, HandleIcon, getPortColor } from "../node-shell"
@@ -331,7 +332,7 @@ export function UploadNodeComponent({ data, id: nodeId, selected }: NodeProps) {
 }
 
 /* ─── Image Grid Node (4x Gen) ─── */
-export function ImageGridNodeComponent({ data, id: nodeId }: NodeProps) {
+export function ImageGridNodeComponent({ data, id: nodeId, selected }: NodeProps) {
   const nd = data as Record<string, unknown>
   const { updateNodeData, deleteElements } = useReactFlow()
   const [isProcessing, setIsProcessing] = useState(false)
@@ -404,9 +405,14 @@ export function ImageGridNodeComponent({ data, id: nodeId }: NodeProps) {
   return (
     <div className="relative">
       <NodeCloseBtn onClick={() => deleteElements({ nodes: [{ id: nodeId }] })} />
-      <NodeShell label="Grid Gen (4x)" icon="⊞" status={(nd._runStatus || nd.status) as string} nodeId={nodeId}>
-        <HandleIcon icon={FileTextIcon} side="left" title="Input: Prompt" /><Handle type="target" position={Position.Left} id="prompt" style={{ background: getPortColor("prompt"), width: 10, height: 10, border: "2px solid var(--background)" }} />
-        <HandleIcon icon={LayoutGridIcon} side="right" title="Output: Grid" /><Handle type="source" position={Position.Right} id="selectedImage" style={{ background: getPortColor("selectedImage"), width: 10, height: 10, border: "2px solid var(--background)" }} />
+      <NodeShell label="Grid Gen (4x)" icon="⊞" status={(nd._runStatus || nd.status) as string} nodeId={nodeId} selected={selected}>
+        {/* Left Handle: Prompt (pink) */}
+        <span className={cn("absolute right-full mr-5 whitespace-nowrap text-[10px] font-medium text-[#f472b6] pointer-events-none select-none transition-opacity duration-200", selected ? "opacity-100" : "opacity-0 group-hover:opacity-100")} style={{ top: "30%", transform: "translateY(-50%)" }}>Prompt</span>
+        <Handle type="target" position={Position.Left} id="prompt" className="!border-[4px] !border-[#f472b6]" style={{ width: 16, height: 16, background: "var(--card)", left: -8, top: "30%", zIndex: 10 }} />
+        
+        {/* Right Handle: Grid Output (green) */}
+        <span className={cn("absolute left-full ml-5 whitespace-nowrap text-[10px] font-medium text-[#34d399] pointer-events-none select-none transition-opacity duration-200", selected ? "opacity-100" : "opacity-0 group-hover:opacity-100")} style={{ top: "50%", transform: "translateY(-50%)" }}>Grid</span>
+        <Handle type="source" position={Position.Right} id="selectedImage" className="!border-[4px] !border-[#34d399]" style={{ width: 16, height: 16, background: "var(--card)", right: -8, top: "50%", zIndex: 10 }} />
         
         <div className="relative w-full aspect-square rounded-xl border border-border bg-muted/20 overflow-hidden mb-2">
           {resultUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={resultUrl} alt="Grid" className="w-full h-full object-cover" /> : (
@@ -658,6 +664,153 @@ export function TTSNodeComponent({ data, id: nodeId }: NodeProps) {
             </div>
           )}
         </div>
+      </NodeShell>
+    </div>
+  )
+}
+
+/* ─── Concatenate Node ─── */
+export function ConcatenateNodeComponent({ data, id: nodeId, selected }: NodeProps) {
+  const nd = data as Record<string, unknown>
+  const { updateNodeData, deleteElements } = useReactFlow()
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Try to use connected values or fallback to node state (if they somehow exist)
+  const mediaId1 = useConnectedValue("video1", "mediaGenerationId") as string | null
+  const mediaId2 = useConnectedValue("video2", "mediaGenerationId") as string | null
+  const mediaId3 = useConnectedValue("video3", "mediaGenerationId") as string | null
+  const mediaId4 = useConnectedValue("video4", "mediaGenerationId") as string | null
+
+  // URL fallback (for preview mostly, if they pass video URL as well)
+  const vidUrl1 = useConnectedValue("video1", "selectedVideo") as string | null
+  const vidUrl2 = useConnectedValue("video2", "selectedVideo") as string | null
+  const vidUrl3 = useConnectedValue("video3", "selectedVideo") as string | null
+  const vidUrl4 = useConnectedValue("video4", "selectedVideo") as string | null
+
+  const trimStart1 = (nd.trimStart1 as number) || 0
+  const trimEnd1 = (nd.trimEnd1 as number) || 0
+  const trimStart2 = (nd.trimStart2 as number) || 0
+  const trimEnd2 = (nd.trimEnd2 as number) || 0
+  const trimStart3 = (nd.trimStart3 as number) || 0
+  const trimEnd3 = (nd.trimEnd3 as number) || 0
+  const trimStart4 = (nd.trimStart4 as number) || 0
+  const trimEnd4 = (nd.trimEnd4 as number) || 0
+
+  const resultUrl = nd._resultVideoUrl as string | undefined
+
+  const handleConcatenate = async () => {
+    // Collect valid media inputs
+    const inputs = []
+    if (mediaId1) inputs.push({ mediaGenerationId: mediaId1, trimStart: trimStart1, trimEnd: trimEnd1 })
+    if (mediaId2) inputs.push({ mediaGenerationId: mediaId2, trimStart: trimStart2, trimEnd: trimEnd2 })
+    if (mediaId3) inputs.push({ mediaGenerationId: mediaId3, trimStart: trimStart3, trimEnd: trimEnd3 })
+    if (mediaId4) inputs.push({ mediaGenerationId: mediaId4, trimStart: trimStart4, trimEnd: trimEnd4 })
+
+    if (inputs.length < 2) {
+      setError("Dibutuhkan minimal 2 video yang saling terhubung.")
+      return
+    }
+
+    setIsProcessing(true)
+    setError(null)
+    updateNodeData(nodeId, { status: "running", _resultVideoUrl: undefined })
+
+    try {
+      const { concatenateVideos, downloadBase64Image } = await import("@/lib/api/google-flow")
+      const result = await concatenateVideos(inputs)
+      
+      // Convert base64 to Blob URL
+      const byteChars = atob(result.encodedVideo)
+      const byteNumbers = new Array(byteChars.length)
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: "video/mp4" })
+      const url = URL.createObjectURL(blob)
+
+      updateNodeData(nodeId, {
+        status: "done",
+        _resultVideoUrl: url,
+        _jobId: result.jobId
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal concatenate video")
+      updateNodeData(nodeId, { status: "error" })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!resultUrl) return
+    const a = document.createElement("a")
+    a.href = resultUrl
+    a.download = `concatenated_${Date.now()}.mp4`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  const renderSlot = (label: string, id: string, mediaId: string | null, vidUrl: string | null, trimStart: number, trimEnd: number, setterStart: string, setterEnd: string, top: string) => (
+    <div className="relative mb-2 pb-2 border-b border-border/50 last:border-0 last:mb-0 last:pb-0">
+      <span className={cn("absolute right-full mr-5 whitespace-nowrap text-[10px] font-medium text-[#06b6d4] pointer-events-none select-none transition-opacity duration-200", selected ? "opacity-100" : "opacity-0 group-hover:opacity-100")} style={{ top: "10px", transform: "translateY(-50%)" }}>{label}</span>
+      <Handle type="target" position={Position.Left} id={id}
+        className="!border-[4px] !border-[#06b6d4]"
+        style={{ width: 16, height: 16, background: "var(--card)", left: -20, top: "10px", zIndex: 10 }} />
+      
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className="w-8 h-8 rounded-md bg-muted/50 border border-border flex items-center justify-center overflow-hidden shrink-0">
+          {vidUrl ? <video src={vidUrl} className="w-full h-full object-cover" muted /> : <VideoIcon className="h-3.5 w-3.5 text-muted-foreground/50" />}
+        </div>
+        <div className="flex flex-col overflow-hidden">
+          <p className="text-[10px] font-medium text-foreground">{label}</p>
+          <p className="text-[9px] text-muted-foreground truncate">{mediaId ? mediaId.slice(-12) : "Belum terhubung"}</p>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <label className="text-[8px] text-muted-foreground uppercase tracking-wider block mb-0.5">Trim Start (s)</label>
+          <input type="number" min={0} max={8} value={trimStart} onChange={e => updateNodeData(nodeId, { [setterStart]: Number(e.target.value) })} className="w-full bg-muted/30 border border-border rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-blue-400" />
+        </div>
+        <div className="flex-1">
+          <label className="text-[8px] text-muted-foreground uppercase tracking-wider block mb-0.5">Trim End (s)</label>
+          <input type="number" min={0} max={8} value={trimEnd} onChange={e => updateNodeData(nodeId, { [setterEnd]: Number(e.target.value) })} className="w-full bg-muted/30 border border-border rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-blue-400" />
+        </div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="relative">
+      <NodeCloseBtn onClick={() => deleteElements({ nodes: [{ id: nodeId }] })} />
+      <NodeShell label="Concatenate Video" icon="🔗" status={(nd._runStatus || nd.status) as string} nodeId={nodeId} selected={selected}>
+        <div className="space-y-1 mb-3">
+          {renderSlot("Video 1", "video1", mediaId1, vidUrl1, trimStart1, trimEnd1, "trimStart1", "trimEnd1", "20%")}
+          {renderSlot("Video 2", "video2", mediaId2, vidUrl2, trimStart2, trimEnd2, "trimStart2", "trimEnd2", "40%")}
+          {renderSlot("Video 3 (Opt)", "video3", mediaId3, vidUrl3, trimStart3, trimEnd3, "trimStart3", "trimEnd3", "60%")}
+          {renderSlot("Video 4 (Opt)", "video4", mediaId4, vidUrl4, trimStart4, trimEnd4, "trimStart4", "trimEnd4", "80%")}
+        </div>
+
+        <button onClick={handleConcatenate} disabled={isProcessing} className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:shadow-md transition active:scale-95 mb-2">
+          {isProcessing ? <><Loader2Icon className="h-3.5 w-3.5 animate-spin" /> Menggabungkan...</> : <><LinkIcon className="h-3.5 w-3.5" /> Gabungkan Video</>}
+        </button>
+
+        {error && <p className="text-[10px] text-red-400 mt-1 mb-2 text-center">{error}</p>}
+
+        {resultUrl && (
+          <div className="mt-2 space-y-2">
+            <div className="relative w-full aspect-video rounded-xl border border-border bg-black overflow-hidden">
+              <video src={resultUrl} controls className="w-full h-full object-contain" />
+            </div>
+            <button onClick={handleDownload} className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-foreground hover:bg-muted transition active:scale-95">
+              <DownloadIcon className="h-3.5 w-3.5" /> Download MP4
+            </button>
+            <p className="text-[9px] text-muted-foreground text-center">Video tidak disimpan ke cloud. Harap download sebelum me-refresh halaman.</p>
+          </div>
+        )}
       </NodeShell>
     </div>
   )

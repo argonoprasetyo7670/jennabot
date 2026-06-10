@@ -6,7 +6,7 @@ import type { NodeTypes } from "@xyflow/react"
 import {
   FileTextIcon, ImageIcon, VideoIcon, RefreshCwIcon, UploadIcon,
   LayoutGridIcon, ScissorsIcon, UserIcon, SlidersHorizontalIcon, MicIcon, Volume2Icon,
-  FolderPlusIcon,
+  FolderPlusIcon, LinkIcon,
 } from "lucide-react"
 import { PromptNodeComponent } from "./nodes/prompt-node"
 import { ImageGenNodeComponent } from "./nodes/image-gen-node"
@@ -15,7 +15,7 @@ import { GalleryNodeComponent, OutputNodeComponent } from "./nodes/output-nodes"
 import {
   ExtendVideoNodeComponent, UploadNodeComponent, ImageGridNodeComponent,
   ExtractFrameNodeComponent, PoseNodeComponent, CameraControlNodeComponent,
-  VoiceNodeComponent, TTSNodeComponent,
+  VoiceNodeComponent, TTSNodeComponent, ConcatenateNodeComponent,
 } from "./nodes/utility-nodes"
 
 /* ─── Node Type Registry ─── */
@@ -33,6 +33,7 @@ export const nodeTypes: NodeTypes = {
   cameraControlNode: CameraControlNodeComponent,
   voiceNode: VoiceNodeComponent,
   ttsNode: TTSNodeComponent,
+  concatNode: ConcatenateNodeComponent,
 }
 
 /* ─── Palette items ─── */
@@ -41,15 +42,16 @@ export const PALETTE_ITEMS = [
   { type: "imageGenNode", label: "Image", Icon: ImageIcon },
   { type: "videoGenNode", label: "Video", Icon: VideoIcon },
   { type: "extendVideoNode", label: "Extend", Icon: RefreshCwIcon },
+  { type: "concatNode", label: "Concat Video", Icon: LinkIcon },
   { type: "uploadNode", label: "Upload", Icon: UploadIcon },
   { type: "imageGridNode", label: "Image Grid", Icon: LayoutGridIcon },
-  { type: "extractFrameNode", label: "Extract Frame", Icon: ScissorsIcon },
+  // { type: "extractFrameNode", label: "Extract Frame", Icon: ScissorsIcon },
   { type: "poseNode", label: "Pose", Icon: UserIcon },
   { type: "cameraControlNode", label: "Camera", Icon: SlidersHorizontalIcon },
   { type: "voiceNode", label: "Voice", Icon: MicIcon },
   { type: "ttsNode", label: "TTS", Icon: Volume2Icon },
-  { type: "galleryNode", label: "Save Gallery", Icon: FolderPlusIcon },
-  { type: "outputNode", label: "Output", Icon: ImageIcon },
+  // { type: "galleryNode", label: "Save Gallery", Icon: FolderPlusIcon },
+  // { type: "outputNode", label: "Output", Icon: ImageIcon },
 ]
 
 /* ─── Agent Input Box ─── */

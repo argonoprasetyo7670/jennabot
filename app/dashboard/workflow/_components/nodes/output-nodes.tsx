@@ -17,6 +17,13 @@ export function GalleryNodeComponent({ data, id: nodeId }: NodeProps) {
   const prevMediaRef = useRef<string | null>(null)
 
   const handleSave = useCallback(async (url: string) => {
+    if (url.startsWith("blob:")) {
+      setSaveStatus("error")
+      updateNodeData(nodeId, { status: "error" })
+      alert("Tidak dapat menyimpan video hasil lokal (seperti Concat) ke Gallery. Silakan download langsung.")
+      return
+    }
+
     setSaveStatus("saving")
     updateNodeData(nodeId, { status: "running" })
     try {
@@ -74,6 +81,10 @@ export function OutputNodeComponent({ data }: NodeProps) {
   const [savingGallery, setSavingGallery] = useState(false)
 
   const handleSaveToGallery = async (url: string) => {
+    if (url.startsWith("blob:")) {
+      alert("Tidak dapat menyimpan video hasil lokal (seperti Concat) ke Gallery. Silakan download langsung.")
+      return
+    }
     setSavingGallery(true)
     try {
       await saveToGallery({ url, prompt: "Workflow output preview" })

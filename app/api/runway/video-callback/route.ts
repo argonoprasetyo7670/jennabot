@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { deductCredits } from "@/lib/credits"
 import crypto from "crypto"
+import { PutObjectCommand } from "@aws-sdk/client-s3"
+import { s3Client, BUCKET_NAME } from "@/lib/s3"
 
 export const maxDuration = 300
 
@@ -78,9 +80,37 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // Save to gallery
+    // Save to gallery with MinIO download
     const galleryId = crypto.randomUUID()
-    const gcsPath = `gallery/${userId}/${galleryId}`
+    const endpointUrl = process.env.MINIO_ENDPOINT || "https://cdn.jennabot.pro"
+    const baseUrl = endpointUrl.replace(/\/$/, "")
+    const gcsPath = `gallery/${userId}/${galleryId}.mp4`
+    
+    // Download video from Runway/UseAPI and upload to MinIO
+    let finalUrl = videoUrl
+    try {
+      console.log(`[runway/video-callback] Downloading video from ${videoUrl}`)
+      const fileRes = await fetch(videoUrl)
+      if (fileRes.ok) {
+        const contentType = fileRes.headers.get("content-type") || "video/mp4"
+        const buffer = Buffer.from(await fileRes.arrayBuffer())
+
+        await s3Client.send(new PutObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: gcsPath,
+          Body: buffer,
+          ContentType: contentType,
+        }))
+
+        finalUrl = `${baseUrl}/${BUCKET_NAME}/${gcsPath}`
+        console.log(`[runway/video-callback] Successfully uploaded to MinIO: ${finalUrl}`)
+      } else {
+        console.warn(`[runway/video-callback] Failed to download video (${fileRes.status}). Using original URL.`)
+      }
+    } catch (downloadErr) {
+      console.warn(`[runway/video-callback] Download/Upload error:`, downloadErr)
+    }
+
     // Use artifact assetId (user:...-asset:...) for mediaGenerationId, NOT taskId
     // This is required by the upscale API which expects a videoAssetId
     const videoAssetId = video?.assetId || video?.id || taskId
@@ -90,7 +120,7 @@ export async function POST(req: NextRequest) {
         userId: userId,
         type: "video",
         gcsPath,
-        gcsUrl: videoUrl,
+        gcsUrl: finalUrl,
         prompt: meta.prompt || null,
         model: meta.model || "runway",
         aspectRatio: meta.aspectRatio || null,

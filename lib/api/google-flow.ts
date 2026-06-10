@@ -467,3 +467,51 @@ export async function extendVideo(params: ExtendVideoParams): Promise<ExtendVide
 
   return { jobId: data.jobId || "", videos }
 }
+
+export interface ConcatenateMediaInput {
+  mediaGenerationId: string
+  trimStart?: number
+  trimEnd?: number
+}
+
+export interface ConcatenateVideoResult {
+  jobId: string
+  encodedVideo: string
+}
+
+/**
+ * Concatenate multiple previously generated videos using UseAPI's /videos/concatenate endpoint.
+ * Requires 2 to 10 videos with the same aspect ratio.
+ * This is a synchronous operation that returns base64-encoded video data.
+ * Due to the large response size, the backend proxy streams the response.
+ */
+export async function concatenateVideos(media: ConcatenateMediaInput[]): Promise<ConcatenateVideoResult> {
+  if (!media || media.length < 2) {
+    throw new Error("At least 2 videos are required for concatenation")
+  }
+
+  const res = await fetch("/api/ai/video-concatenate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ media }),
+  })
+
+  let data
+  try {
+    data = await res.json()
+  } catch (err) {
+    throw new Error("Failed to parse concatenation response. The payload might be too large.")
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : data.error?.message || `Concatenate failed (${res.status})`
+    )
+  }
+
+  if (!data.encodedVideo) {
+    throw new Error("No encoded video returned from concatenation")
+  }
+
+  return { jobId: data.jobId || "", encodedVideo: data.encodedVideo }
+}

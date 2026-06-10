@@ -66,17 +66,26 @@ export async function POST(req: NextRequest) {
     //    Frontend sometimes passes proxy URLs like /api/ai/video-download?url=<real>&mode=inline
     //    which are relative and can't be fetched server-side. Extract the real URL.
     let fetchUrl = url
-    if (typeof url === "string" && url.startsWith("/api/ai/video-download")) {
-      const qs = url.split("?")[1]
-      if (qs) {
-        const realUrl = new URLSearchParams(qs).get("url")
+    if (typeof url === "string" && url.includes("/api/ai/video-download")) {
+      try {
+        // Handle both relative and absolute URLs
+        const searchParams = new URL(url.startsWith("http") ? url : `http://localhost${url}`).searchParams
+        const realUrl = searchParams.get("url")
         if (realUrl) fetchUrl = realUrl
+      } catch (e) {
+        console.warn("Failed to parse video-download URL:", url)
       }
     }
 
-    const fileRes = await fetch(fetchUrl)
+    // Pass USEAPI_TOKEN if it's a useapi URL
+    const headers: Record<string, string> = {}
+    if (fetchUrl.includes("useapi.net")) {
+      headers["Authorization"] = `Bearer ${process.env.USEAPI_TOKEN}`
+    }
+
+    const fileRes = await fetch(fetchUrl, { headers })
     if (!fileRes.ok) {
-      throw new Error(`Failed to fetch file from URL: ${fileRes.status}`)
+      throw new Error(`Failed to fetch file from URL: ${fileRes.status} - ${fetchUrl}`)
     }
 
     const contentType = fileRes.headers.get("content-type") || "application/octet-stream"
