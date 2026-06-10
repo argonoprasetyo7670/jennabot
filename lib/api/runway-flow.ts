@@ -81,12 +81,22 @@ export async function uploadRunwayAsset(
     body: file,
   })
 
-  const data = await res.json()
+  const text = await res.text()
+  let data: Record<string, unknown>
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(
+      !res.ok
+        ? `Upload gagal (${res.status}): ${text.slice(0, 120)}`
+        : `Response tidak valid dari server`
+    )
+  }
   if (!res.ok) {
     throw new Error(
       typeof data.error === "string"
         ? data.error
-        : data.error?.message || `Upload failed (${res.status})`
+        : (data.error as Record<string, string>)?.message || `Upload failed (${res.status})`
     )
   }
 
@@ -113,12 +123,22 @@ export async function generateRunwayVideo(
     body: JSON.stringify(params),
   })
 
-  const startData = await startRes.json()
+  const startText = await startRes.text()
+  let startData: Record<string, unknown>
+  try {
+    startData = JSON.parse(startText)
+  } catch {
+    throw new Error(
+      !startRes.ok
+        ? `Gagal memulai generate (${startRes.status}): ${startText.slice(0, 120)}`
+        : `Response tidak valid dari server`
+    )
+  }
   if (!startRes.ok) {
     throw new Error(
       typeof startData.error === "string"
         ? startData.error
-        : startData.error?.message || `Generation failed (${startRes.status})`
+        : (startData.error as Record<string, string>)?.message || `Generation failed (${startRes.status})`
     )
   }
 

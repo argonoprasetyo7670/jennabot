@@ -62,8 +62,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: existing, alreadySaved: true })
     }
 
-    // 1. Fetch file from temporary URL
-    const fileRes = await fetch(url)
+    // 1. Resolve proxy URLs to actual URLs
+    //    Frontend sometimes passes proxy URLs like /api/ai/video-download?url=<real>&mode=inline
+    //    which are relative and can't be fetched server-side. Extract the real URL.
+    let fetchUrl = url
+    if (typeof url === "string" && url.startsWith("/api/ai/video-download")) {
+      const qs = url.split("?")[1]
+      if (qs) {
+        const realUrl = new URLSearchParams(qs).get("url")
+        if (realUrl) fetchUrl = realUrl
+      }
+    }
+
+    const fileRes = await fetch(fetchUrl)
     if (!fileRes.ok) {
       throw new Error(`Failed to fetch file from URL: ${fileRes.status}`)
     }

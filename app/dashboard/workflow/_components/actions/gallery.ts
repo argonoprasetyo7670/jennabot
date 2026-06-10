@@ -9,10 +9,10 @@ export interface GallerySaveOptions {
   type?: "image" | "video"
 }
 
-export async function saveToGallery(options: GallerySaveOptions): Promise<void> {
+export async function saveToGallery(options: GallerySaveOptions): Promise<{ gcsUrl: string; item: any }> {
   const { url, prompt = "Workflow auto-save", model, aspectRatio, type } = options
   const isVideo = type === "video" || url.includes("video") || url.includes(".mp4") || url.includes("mode=inline")
-  await fetch("/api/gallery/save", {
+  const res = await fetch("/api/gallery/save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -23,6 +23,10 @@ export async function saveToGallery(options: GallerySaveOptions): Promise<void> 
       type: isVideo ? "video" : "image",
     }),
   })
+  if (!res.ok) throw new Error("Failed to save to gallery")
+  const data = await res.json()
+  if (data.error) throw new Error(data.error)
+  return { gcsUrl: data.item?.gcsUrl || url, item: data.item }
 }
 
 export function isVideoUrl(url: string): boolean {

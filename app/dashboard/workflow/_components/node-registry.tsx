@@ -6,6 +6,7 @@ import type { NodeTypes } from "@xyflow/react"
 import {
   FileTextIcon, ImageIcon, VideoIcon, RefreshCwIcon, UploadIcon,
   LayoutGridIcon, ScissorsIcon, UserIcon, SlidersHorizontalIcon, MicIcon, Volume2Icon,
+  FolderPlusIcon,
 } from "lucide-react"
 import { PromptNodeComponent } from "./nodes/prompt-node"
 import { ImageGenNodeComponent } from "./nodes/image-gen-node"
@@ -47,6 +48,8 @@ export const PALETTE_ITEMS = [
   { type: "cameraControlNode", label: "Camera", Icon: SlidersHorizontalIcon },
   { type: "voiceNode", label: "Voice", Icon: MicIcon },
   { type: "ttsNode", label: "TTS", Icon: Volume2Icon },
+  { type: "galleryNode", label: "Save Gallery", Icon: FolderPlusIcon },
+  { type: "outputNode", label: "Output", Icon: ImageIcon },
 ]
 
 /* ─── Agent Input Box ─── */

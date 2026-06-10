@@ -62,14 +62,26 @@ export default function MotionControlPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > 20 * 1024 * 1024) {
+      setError(`Gambar terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 20MB.`)
+      if (imageInputRef.current) imageInputRef.current.value = ""
+      return
+    }
     if (characterImage) URL.revokeObjectURL(characterImage.preview)
     setCharacterImage({ file, preview: URL.createObjectURL(file) })
+    setError(null)
     if (imageInputRef.current) imageInputRef.current.value = ""
   }
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    if (file.size > 100 * 1024 * 1024) {
+      setError(`Video terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 100MB.`)
+      if (videoInputRef.current) videoInputRef.current.value = ""
+      return
+    }
 
     // Validate video duration
     const videoEl = document.createElement("video")

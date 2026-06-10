@@ -94,25 +94,45 @@ export function useImageGenerateNode(
       // Always use nano-banana-pro (supports up to 10 references)
       const model = "nano-banana-pro" as ImageModel
       const count = (nodeData.count as number) || DEFAULTS.imageCount
+      const aspectRatio = ((nodeData.aspectRatio as string) || DEFAULTS.imageAspectRatio) as "9:16"
 
       const result = await generateImages({
         prompt: activePrompt.trim(),
         model,
-        aspectRatio: ((nodeData.aspectRatio as string) || DEFAULTS.imageAspectRatio) as "9:16",
+        aspectRatio,
         count,
         ...(refs.length > 0 ? { references: refs, email } : {}),
       })
 
+      // Auto-save to gallery and use CDN URLs
+      const processedImages = await Promise.all(
+        result.images.map(async (img) => {
+          try {
+            const saved = await saveToGallery({
+              url: img.url,
+              prompt: activePrompt.trim(),
+              model,
+              aspectRatio,
+              type: "image",
+            })
+            return { ...img, url: saved.gcsUrl }
+          } catch (e) {
+            console.error("Failed to auto-save to gallery:", e)
+            return img
+          }
+        })
+      )
+
       updateNodeData(nodeId, {
         status: "done",
-        _generatedImages: result.images,
+        _generatedImages: processedImages,
         _selectedIdx: 0,
-        selectedImage: result.images[0]?.url || "",
-        _selectedMediaId: result.images[0]?.mediaGenerationId || "",
+        selectedImage: processedImages[0]?.url || "",
+        _selectedMediaId: processedImages[0]?.mediaGenerationId || "",
         _selectedEmail: email || "",
-        images: result.images.map(i => i.url),
-        mediaIds: result.images.map(i => i.mediaGenerationId || ""),
-        emails: result.images.map(() => email || ""),
+        images: processedImages.map(i => i.url),
+        mediaIds: processedImages.map(i => i.mediaGenerationId || ""),
+        emails: processedImages.map(() => email || ""),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal generate gambar")

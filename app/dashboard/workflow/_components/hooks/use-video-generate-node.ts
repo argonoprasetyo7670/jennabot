@@ -92,7 +92,26 @@ export function useVideoGenerateNode(
         ...(email ? { email } : {}),
       })
 
-      const vid = result.videos[0]
+      // Auto-save to gallery and use CDN URLs
+      const processedVideos = await Promise.all(
+        result.videos.map(async (vid) => {
+          if (!vid || (!vid.rawUrl && !vid.url)) return vid
+          try {
+            const saved = await saveToGallery({
+              url: vid.rawUrl || vid.url,
+              prompt: activePrompt.trim(),
+              model,
+              type: "video",
+            })
+            return { ...vid, url: saved.gcsUrl, rawUrl: saved.gcsUrl }
+          } catch (e) {
+            console.error("Failed to auto-save to gallery:", e)
+            return vid
+          }
+        })
+      )
+
+      const vid = processedVideos[0]
       updateNodeData(nodeId, {
         status: "done",
         _videoUrl: vid?.url || "",
@@ -100,7 +119,7 @@ export function useVideoGenerateNode(
         selectedVideo: vid?.url || "",
         _videoMediaId: vid?.mediaGenerationId || "",
         mediaGenerationId: vid?.mediaGenerationId || "",
-        videos: result.videos.map(v => v.url),
+        videos: processedVideos.map(v => v.url),
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal generate video")

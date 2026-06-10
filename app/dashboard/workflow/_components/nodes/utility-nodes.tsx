@@ -330,46 +330,99 @@ export function UploadNodeComponent({ data, id: nodeId, selected }: NodeProps) {
   )
 }
 
-/* ─── Image Grid Node ─── */
+/* ─── Image Grid Node (4x Gen) ─── */
 export function ImageGridNodeComponent({ data, id: nodeId }: NodeProps) {
   const nd = data as Record<string, unknown>
   const { updateNodeData, deleteElements } = useReactFlow()
   const [isProcessing, setIsProcessing] = useState(false)
-  const connectedImages = useConnectedValue("images") as string[] | string | null
-  const imgArr = Array.isArray(connectedImages) ? connectedImages : connectedImages ? [connectedImages] : []
-  const layout = (nd.layout as string) || "2x2"
+  
+  const connectedPrompt = useConnectedValue("prompt") as string | null
+  const [localPrompt, setLocalPrompt] = useState((nd._localPrompt as string) || "")
+  const activePrompt = connectedPrompt || localPrompt
+
   const resultUrl = nd._gridResult as string | undefined
-  const handleCompose = async () => {
-    if (imgArr.length === 0) return; setIsProcessing(true); updateNodeData(nodeId, { status: "running" })
+
+  const handleGenerateAndCompose = async () => {
+    if (!activePrompt.trim()) return
+    setIsProcessing(true)
+    updateNodeData(nodeId, { status: "running" })
+    
     try {
-      const cols = layout === "1x4" ? 4 : layout === "3x3" ? 3 : 2; const rows = layout === "1x4" ? 1 : layout === "3x3" ? 3 : 2
-      const cellW = 512, cellH = 512, canvas = document.createElement("canvas")
-      canvas.width = cellW * cols; canvas.height = cellH * rows; const ctx = canvas.getContext("2d")!
-      const images = await Promise.all(imgArr.slice(0, cols * rows).map(url => new Promise<HTMLImageElement>((res, rej) => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => res(img); img.onerror = () => rej(new Error("Load failed")); img.src = url })))
+      const { generateImages } = await import("@/lib/api/google-flow")
+      // Generate 4 images
+      const result = await generateImages({
+        prompt: activePrompt.trim(),
+        model: "nano-banana-pro",
+        aspectRatio: "1:1",
+        count: 4,
+      })
+
+      if (!result.images || result.images.length === 0) {
+        throw new Error("Gagal generate gambar")
+      }
+
+      // We might get less than 4 if there's an issue, but let's pad them if needed
+      const imgUrls = result.images.map(i => i.url)
+      while (imgUrls.length < 4) imgUrls.push(imgUrls[imgUrls.length - 1] || "")
+
+      // Canvas composition 2x2
+      const cellW = 512, cellH = 512, cols = 2, rows = 2
+      const canvas = document.createElement("canvas")
+      canvas.width = cellW * cols; canvas.height = cellH * rows
+      const ctx = canvas.getContext("2d")!
+
+      const images = await Promise.all(imgUrls.slice(0, 4).map(url => new Promise<HTMLImageElement>((res, rej) => {
+        const img = new Image()
+        img.crossOrigin = "anonymous"
+        img.onload = () => res(img)
+        img.onerror = () => rej(new Error("Load failed"))
+        img.src = url
+      })))
+
       images.forEach((img, i) => { ctx.drawImage(img, (i % cols) * cellW, Math.floor(i / cols) * cellH, cellW, cellH) })
       const dataUrl = canvas.toDataURL("image/jpeg", 0.92)
-      updateNodeData(nodeId, { status: "done", selectedImage: dataUrl, _gridResult: dataUrl })
-    } catch { updateNodeData(nodeId, { status: "error" }) } finally { setIsProcessing(false) }
+
+      // Optionally save the grid to gallery to get a CDN URL
+      const { saveToGallery } = await import("../actions/gallery")
+      try {
+         const saved = await saveToGallery({ url: dataUrl, prompt: activePrompt.trim(), type: "image", model: "nano-banana-pro" })
+         const finalUrl = saved.gcsUrl
+         updateNodeData(nodeId, { status: "done", selectedImage: finalUrl, _gridResult: finalUrl })
+      } catch (e) {
+         console.error("Gallery save failed:", e)
+         updateNodeData(nodeId, { status: "done", selectedImage: dataUrl, _gridResult: dataUrl })
+      }
+
+    } catch (e) { 
+      console.error("Grid generation failed:", e)
+      updateNodeData(nodeId, { status: "error" }) 
+    } finally { 
+      setIsProcessing(false) 
+    }
   }
+
   return (
     <div className="relative">
       <NodeCloseBtn onClick={() => deleteElements({ nodes: [{ id: nodeId }] })} />
-      <NodeShell label="Image Grid" icon="⊞" status={(nd._runStatus || nd.status) as string} nodeId={nodeId}>
-        <HandleIcon icon={ImageIcon} side="left" title="Input: Images" /><Handle type="target" position={Position.Left} id="images" style={{ background: getPortColor("images"), width: 10, height: 10, border: "2px solid var(--background)" }} />
+      <NodeShell label="Grid Gen (4x)" icon="⊞" status={(nd._runStatus || nd.status) as string} nodeId={nodeId}>
+        <HandleIcon icon={FileTextIcon} side="left" title="Input: Prompt" /><Handle type="target" position={Position.Left} id="prompt" style={{ background: getPortColor("prompt"), width: 10, height: 10, border: "2px solid var(--background)" }} />
         <HandleIcon icon={LayoutGridIcon} side="right" title="Output: Grid" /><Handle type="source" position={Position.Right} id="selectedImage" style={{ background: getPortColor("selectedImage"), width: 10, height: 10, border: "2px solid var(--background)" }} />
+        
         <div className="relative w-full aspect-square rounded-xl border border-border bg-muted/20 overflow-hidden mb-2">
           {resultUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={resultUrl} alt="Grid" className="w-full h-full object-cover" /> : (
-            <div className="grid gap-0.5 h-full p-2" style={{ gridTemplateColumns: `repeat(${layout === "1x4" ? 4 : layout === "3x3" ? 3 : 2}, 1fr)` }}>
-              {Array.from({ length: layout === "1x4" ? 4 : layout === "3x3" ? 9 : 4 }).map((_, i) => (
-                <div key={i} className="rounded-lg border border-border/40 bg-muted/30 flex items-center justify-center overflow-hidden">
-                  {imgArr[i] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={imgArr[i]} alt="" className="w-full h-full object-cover" /> : <ImageIcon className="h-3 w-3 text-muted-foreground/20" />}
+            <div className="grid gap-0.5 h-full p-2 grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-lg border border-border/40 bg-muted/30 flex flex-col items-center justify-center overflow-hidden">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground/20 mb-1" />
+                  <span className="text-[9px] text-muted-foreground/40 font-medium">Img {i+1}</span>
                 </div>))}
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <select value={layout} onChange={e => updateNodeData(nodeId, { layout: e.target.value })} className="flex-1 rounded-lg border border-border bg-muted/20 px-2 py-1.5 text-xs text-foreground focus:outline-none"><option value="2x2">2×2 Grid</option><option value="3x3">3×3 Grid</option><option value="1x4">1×4 Strip</option></select>
-          <button onClick={handleCompose} disabled={isProcessing || imgArr.length === 0} className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:shadow-md transition active:scale-95">{isProcessing ? <Loader2Icon className="h-3 w-3 animate-spin" /> : <LayoutGridIcon className="h-3 w-3" />} Compose</button>
+        
+        <div className="space-y-2 mb-1">
+          <textarea value={connectedPrompt || localPrompt} onChange={e => { if (!connectedPrompt) { setLocalPrompt(e.target.value); updateNodeData(nodeId, { _localPrompt: e.target.value }) } }} placeholder={connectedPrompt ? "Prompt dari node..." : "Deskripsi grid 4x gambar..."} readOnly={!!connectedPrompt} rows={2} className="w-full rounded-xl border border-border bg-muted/20 px-3 py-2 text-[11px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-blue-400/50 resize-none" />
+          <button onClick={handleGenerateAndCompose} disabled={isProcessing || !activePrompt.trim()} className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 py-2 text-xs font-medium text-white disabled:opacity-40 hover:shadow-md transition active:scale-95">{isProcessing ? <><Loader2Icon className="h-3.5 w-3.5 animate-spin" /> Generating 4x...</> : <><LayoutGridIcon className="h-3.5 w-3.5" /> Generate 2x2 Grid</>}</button>
         </div>
       </NodeShell>
     </div>
