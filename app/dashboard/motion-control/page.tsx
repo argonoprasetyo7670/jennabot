@@ -62,8 +62,8 @@ export default function MotionControlPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 20 * 1024 * 1024) {
-      setError(`Gambar terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 20MB.`)
+    if (file.size > 4.5 * 1024 * 1024) {
+      setError(`Gambar terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 4.5MB.`)
       if (imageInputRef.current) imageInputRef.current.value = ""
       return
     }
@@ -77,8 +77,8 @@ export default function MotionControlPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 100 * 1024 * 1024) {
-      setError(`Video terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 100MB.`)
+    if (file.size > 4.5 * 1024 * 1024) {
+      setError(`Video terlalu besar (${(file.size / 1024 / 1024).toFixed(1)}MB). Maksimal 4.5MB.`)
       if (videoInputRef.current) videoInputRef.current.value = ""
       return
     }
