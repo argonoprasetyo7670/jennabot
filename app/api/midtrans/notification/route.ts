@@ -24,19 +24,9 @@ export async function POST(req: NextRequest) {
       transaction_id,
     } = body
 
-    // Verify signature: SHA512(order_id + status_code + gross_amount + server_key)
-    const expectedSignature = crypto
-      .createHash("sha512")
-      .update(order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY)
-      .digest("hex")
-
-    if (signature_key !== expectedSignature) {
-      console.error(`[midtrans] Invalid signature for order ${order_id}`)
-      return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
-    }
-
-    // ===== EDUTASKY ROUTING =====
-    // Jika order_id mengandung "EDTKSY", forward ke EduTasky
+    // ===== EDUTASKY ROUTING (before signature check — different server key) =====
+    // Jika order_id mengandung "EDTKSY", forward ke EduTasky tanpa verifikasi
+    // karena EduTasky pakai server key berbeda (sandbox vs production)
     if (order_id.includes("EDTKSY")) {
       const edutaskyUrl = process.env.EDUTASKY_WEBHOOK_URL || "https://edutasky.id/api/midtrans/callback"
       const webhookSecret = process.env.EDUTASKY_WEBHOOK_SECRET || ""
@@ -60,6 +50,17 @@ export async function POST(req: NextRequest) {
       }
     }
     // ===== END EDUTASKY ROUTING =====
+
+    // Verify signature: SHA512(order_id + status_code + gross_amount + server_key)
+    const expectedSignature = crypto
+      .createHash("sha512")
+      .update(order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY)
+      .digest("hex")
+
+    if (signature_key !== expectedSignature) {
+      console.error(`[midtrans] Invalid signature for order ${order_id}`)
+      return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
+    }
 
     // Find the transaction
     const transaction = await prisma.transactions.findUnique({
