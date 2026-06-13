@@ -35,6 +35,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
     }
 
+    // ===== EDUTASKY ROUTING =====
+    // Jika order_id mengandung "EDTKSY", forward ke EduTasky
+    if (order_id.includes("EDTKSY")) {
+      const edutaskyUrl = process.env.EDUTASKY_WEBHOOK_URL || "https://edutasky.id/api/midtrans/callback"
+      const webhookSecret = process.env.EDUTASKY_WEBHOOK_SECRET || ""
+
+      try {
+        const forwardRes = await fetch(edutaskyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-webhook-secret": webhookSecret,
+          },
+          body: JSON.stringify(body),
+        })
+
+        const forwardData = await forwardRes.json()
+        console.log(`[midtrans] Forwarded EDTKSY order ${order_id} to EduTasky → ${forwardRes.status}`)
+        return NextResponse.json({ status: "forwarded", edutasky: forwardData })
+      } catch (forwardErr) {
+        console.error(`[midtrans] Failed to forward to EduTasky:`, forwardErr)
+        return NextResponse.json({ error: "Failed to forward to EduTasky" }, { status: 502 })
+      }
+    }
+    // ===== END EDUTASKY ROUTING =====
+
     // Find the transaction
     const transaction = await prisma.transactions.findUnique({
       where: { orderId: order_id },
