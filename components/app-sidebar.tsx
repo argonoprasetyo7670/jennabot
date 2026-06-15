@@ -146,6 +146,12 @@ const navItems: NavItem[] = [
     icon: <GalleryHorizontalEndIcon className="h-4 w-4" />,
     type: "link",
   },
+  {
+    title: "Characters",
+    url: "/dashboard/characters",
+    icon: <UserIcon className="h-4 w-4" />,
+    type: "link",
+  },
   // {
   //   title: "Workflow Builder",
   //   url: "/dashboard/workflow",

@@ -13,6 +13,7 @@ export type ImageModel = (typeof IMAGE_MODELS)[number]["value"]
 
 export const VIDEO_MODELS = [
   { value: "veo-3.1-lite-low-priority", label: "Veo 3.1" },
+  { value: "omni-flash", label: "Omni Flash" },
 ] as const
 
 export type VideoModel = (typeof VIDEO_MODELS)[number]["value"]
@@ -35,6 +36,7 @@ export function toVideoAspect(ar: string): "landscape" | "portrait" {
 }
 
 /** Map duration string → UseAPI numeric seconds param */
-export function toDurationSeconds(dur: string): 8 | 8 {
-  return dur === "8s" ? 8 : 8
+export function toDurationSeconds(dur: string): number {
+  const parsed = parseInt(dur, 10)
+  return isNaN(parsed) ? 8 : parsed
 }

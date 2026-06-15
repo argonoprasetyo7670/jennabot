@@ -36,6 +36,7 @@ export interface GenerationJob {
   createdAt: Date
   completedAt?: Date
   references?: { file?: File; galleryUrl?: string }[]
+  characters?: string[]  // character ref IDs for character_1..7
   params: GenerateImageParams | GenerateVideoParams
   /**
    * UseAPI jobId returned immediately after POST /api/ai/video-generate.
@@ -171,6 +172,7 @@ function submitJobToStore(
     videos: [],
     createdAt: new Date(),
     references,
+    characters: params.characters,
     params,
   }
 
@@ -216,6 +218,13 @@ function submitJobToStore(
         if (params.seed !== undefined) body.seed = params.seed
         if (email) body.email = email
         if (refs.length > 0) body.references = refs
+
+        // Pass character refs as character_1..N
+        if (params.characters?.length) {
+          params.characters.forEach((charRef: string, i: number) => {
+            body[`character_${i + 1}`] = charRef
+          })
+        }
 
         const startRes = await fetch("/api/ai/image-generate", {
           method: "POST",
@@ -388,6 +397,11 @@ function submitVideoJobToStore(
         if (videoParams.voice) body.voice = videoParams.voice
         if (videoParams.referenceImages?.length) body.referenceImages = videoParams.referenceImages
 
+        // Pass character refs as character_1..N
+        if (params.characters?.length) {
+          body.characters = params.characters
+        }
+
         const startRes = await fetch("/api/ai/video-generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -541,6 +555,9 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
           }),
         }).then(res => res.json()).then(data => {
           if (data.item?.gcsUrl) {
+            // Pre-add CDN URL to saved set BEFORE updating store
+            // This prevents re-save when jobs array changes from URL update
+            saved.add(data.item.gcsUrl)
             const currentStore = getStore()
             const currentJob = currentStore.jobs.find(j => j.id === job.id)
             if (currentJob && currentJob.images) {
@@ -571,6 +588,8 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
           }),
         }).then(res => res.json()).then(data => {
           if (data.item?.gcsUrl) {
+            // Pre-add CDN URL to saved set BEFORE updating store
+            saved.add(data.item.gcsUrl)
             const currentStore = getStore()
             const currentJob = currentStore.jobs.find(j => j.id === job.id)
             if (currentJob && currentJob.videos) {

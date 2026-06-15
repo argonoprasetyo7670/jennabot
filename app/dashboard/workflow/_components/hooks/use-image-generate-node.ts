@@ -96,12 +96,16 @@ export function useImageGenerateNode(
       const count = (nodeData.count as number) || DEFAULTS.imageCount
       const aspectRatio = ((nodeData.aspectRatio as string) || DEFAULTS.imageAspectRatio) as "9:16"
 
+      const selectedCharacters = (nodeData._selectedCharacters as { characterRefId: string, displayName: string, imageUrl1?: string }[]) || []
+      const characters = selectedCharacters.map(c => c.characterRefId)
+
       const result = await generateImages({
         prompt: activePrompt.trim(),
         model,
         aspectRatio,
         count,
         ...(refs.length > 0 ? { references: refs, email } : {}),
+        ...(characters.length > 0 ? { characters } : {}),
       })
 
       // Auto-save to gallery and use CDN URLs

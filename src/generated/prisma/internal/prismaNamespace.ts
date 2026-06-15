@@ -407,7 +407,9 @@ export const ModelName = {
   user_credits: 'user_credits',
   users: 'users',
   verification_tokens: 'verification_tokens',
-  promo_codes: 'promo_codes'
+  promo_codes: 'promo_codes',
+  user_voices: 'user_voices',
+  user_characters: 'user_characters'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -423,7 +425,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "accounts" | "api_keys" | "api_usage" | "credit_costs" | "credit_packages" | "credit_transactions" | "gallery_items" | "referrals" | "reseller_credit_packages" | "reseller_transactions" | "reseller_withdrawals" | "resellers" | "sessions" | "settings" | "subscription_plans" | "subscriptions" | "transactions" | "upscale_items" | "usage_stats" | "user_assets" | "user_credits" | "users" | "verification_tokens" | "promo_codes"
+    modelProps: "accounts" | "api_keys" | "api_usage" | "credit_costs" | "credit_packages" | "credit_transactions" | "gallery_items" | "referrals" | "reseller_credit_packages" | "reseller_transactions" | "reseller_withdrawals" | "resellers" | "sessions" | "settings" | "subscription_plans" | "subscriptions" | "transactions" | "upscale_items" | "usage_stats" | "user_assets" | "user_credits" | "users" | "verification_tokens" | "promo_codes" | "user_voices" | "user_characters"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2203,6 +2205,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    user_voices: {
+      payload: Prisma.$user_voicesPayload<ExtArgs>
+      fields: Prisma.user_voicesFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.user_voicesFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.user_voicesFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>
+        }
+        findFirst: {
+          args: Prisma.user_voicesFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.user_voicesFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>
+        }
+        findMany: {
+          args: Prisma.user_voicesFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>[]
+        }
+        create: {
+          args: Prisma.user_voicesCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>
+        }
+        createMany: {
+          args: Prisma.user_voicesCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.user_voicesCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>[]
+        }
+        delete: {
+          args: Prisma.user_voicesDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>
+        }
+        update: {
+          args: Prisma.user_voicesUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>
+        }
+        deleteMany: {
+          args: Prisma.user_voicesDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.user_voicesUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.user_voicesUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>[]
+        }
+        upsert: {
+          args: Prisma.user_voicesUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_voicesPayload>
+        }
+        aggregate: {
+          args: Prisma.User_voicesAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUser_voices>
+        }
+        groupBy: {
+          args: Prisma.user_voicesGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.User_voicesGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.user_voicesCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.User_voicesCountAggregateOutputType> | number
+        }
+      }
+    }
+    user_characters: {
+      payload: Prisma.$user_charactersPayload<ExtArgs>
+      fields: Prisma.user_charactersFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.user_charactersFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.user_charactersFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>
+        }
+        findFirst: {
+          args: Prisma.user_charactersFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.user_charactersFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>
+        }
+        findMany: {
+          args: Prisma.user_charactersFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>[]
+        }
+        create: {
+          args: Prisma.user_charactersCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>
+        }
+        createMany: {
+          args: Prisma.user_charactersCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.user_charactersCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>[]
+        }
+        delete: {
+          args: Prisma.user_charactersDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>
+        }
+        update: {
+          args: Prisma.user_charactersUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>
+        }
+        deleteMany: {
+          args: Prisma.user_charactersDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.user_charactersUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.user_charactersUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>[]
+        }
+        upsert: {
+          args: Prisma.user_charactersUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$user_charactersPayload>
+        }
+        aggregate: {
+          args: Prisma.User_charactersAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUser_characters>
+        }
+        groupBy: {
+          args: Prisma.user_charactersGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.User_charactersGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.user_charactersCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.User_charactersCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2649,6 +2799,46 @@ export const Promo_codesScalarFieldEnum = {
 export type Promo_codesScalarFieldEnum = (typeof Promo_codesScalarFieldEnum)[keyof typeof Promo_codesScalarFieldEnum]
 
 
+export const User_voicesScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  voiceRefId: 'voiceRefId',
+  displayName: 'displayName',
+  baseVoice: 'baseVoice',
+  dialog: 'dialog',
+  voicePerformance: 'voicePerformance',
+  audioUrl: 'audioUrl',
+  workflowId: 'workflowId',
+  mediaId: 'mediaId',
+  email: 'email',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type User_voicesScalarFieldEnum = (typeof User_voicesScalarFieldEnum)[keyof typeof User_voicesScalarFieldEnum]
+
+
+export const User_charactersScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  characterRefId: 'characterRefId',
+  entityId: 'entityId',
+  displayName: 'displayName',
+  personalityNotes: 'personalityNotes',
+  imageRef1: 'imageRef1',
+  imageRef2: 'imageRef2',
+  imageUrl1: 'imageUrl1',
+  imageUrl2: 'imageUrl2',
+  voiceType: 'voiceType',
+  voiceValue: 'voiceValue',
+  email: 'email',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type User_charactersScalarFieldEnum = (typeof User_charactersScalarFieldEnum)[keyof typeof User_charactersScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2875,6 +3065,8 @@ export type GlobalOmitConfig = {
   users?: Prisma.usersOmit
   verification_tokens?: Prisma.verification_tokensOmit
   promo_codes?: Prisma.promo_codesOmit
+  user_voices?: Prisma.user_voicesOmit
+  user_characters?: Prisma.user_charactersOmit
 }
 
 /* Types for Logging */

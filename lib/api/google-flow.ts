@@ -13,6 +13,7 @@ export interface GenerateImageParams {
   count?: number
   seed?: number
   references?: string[]
+  characters?: string[]  // character ref IDs → character_1..7
   email?: string
 }
 
@@ -161,7 +162,7 @@ export async function generateImages(params: GenerateImageParams): Promise<Gener
       if (pollData.status === "done") {
         console.log(`[image] Job ${jobId}: done!`)
         const images = pollData.images || []
-        
+
         if (images.length === 0) {
           throw new Error("No images were generated. Try a different prompt.")
         }
@@ -258,6 +259,7 @@ export interface GenerateVideoParams {
   startImage?: string
   endImage?: string
   referenceImages?: string[]
+  characters?: string[]  // character ref IDs → character_1..7
   voice?: string
   email?: string
 }
@@ -331,7 +333,7 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
   // Step 2: Poll for results every 5 seconds (max 5 minutes)
   const POLL_INTERVAL = 5000
   const MAX_POLLS = 60 // 5 min max
-  
+
   for (let i = 0; i < MAX_POLLS; i++) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL))
 
@@ -350,7 +352,7 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
 
       if (pollData.status === "done") {
         console.log(`[video] Job ${jobId}: done!`)
-        
+
         // Parse the UseAPI response
         const videos: GeneratedVideo[] = (pollData.media || [])
           .map((m: Record<string, unknown>) => {
@@ -515,3 +517,60 @@ export async function concatenateVideos(media: ConcatenateMediaInput[]): Promise
 
   return { jobId: data.jobId || "", encodedVideo: data.encodedVideo }
 }
+
+/* ─── Voice & Character ─── */
+
+export const SYSTEM_VOICE_PRESETS = [
+  "Achernar", "Achird", "Algenib", "Algieba", "Alnilam",
+  "Aoede", "Autonoe", "Callirrhoe", "Charon", "Despina",
+  "Enceladus", "Erinome", "Fenrir", "Gacrux", "Iapetus",
+  "Kore", "Laomedeia", "Leda", "Orus", "Puck",
+  "Pulcherrima", "Rasalgethi", "Sadachbia", "Sadaltager",
+  "Schedar", "Sulafat", "Umbriel", "Vindemiatrix", "Zephyr",
+  "Zubenelgenubi",
+] as const
+
+export type SystemVoicePreset = typeof SYSTEM_VOICE_PRESETS[number]
+
+export interface CustomVoice {
+  id: string
+  voiceRefId: string
+  displayName: string
+  baseVoice: string
+  dialog: string
+  voicePerformance: string
+  audioUrl?: string | null
+  source: "user"
+  createdAt: string
+}
+
+export interface CreateVoiceParams {
+  voice: string
+  dialog: string
+  voicePerformance: string
+  displayName: string
+  email?: string
+}
+
+export interface Character {
+  id: string
+  characterRefId: string
+  entityId: string
+  displayName: string
+  personalityNotes?: string | null
+  imageRef1: string
+  imageRef2?: string | null
+  voiceType?: string | null
+  voiceValue?: string | null
+  createdAt: string
+}
+
+export interface CreateCharacterParams {
+  displayName: string
+  imageReference_1: string
+  imageReference_2?: string
+  personalityNotes?: string
+  voice?: string
+}
+
+/* ── Voice Functions ── */

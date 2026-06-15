@@ -329,6 +329,8 @@ export type usersWhereInput = {
   usage_stats?: Prisma.Usage_statsListRelationFilter
   user_assets?: Prisma.User_assetsListRelationFilter
   user_credits?: Prisma.XOR<Prisma.User_creditsNullableScalarRelationFilter, Prisma.user_creditsWhereInput> | null
+  user_voices?: Prisma.User_voicesListRelationFilter
+  user_characters?: Prisma.User_charactersListRelationFilter
   resellers_users_resellerIdToresellers?: Prisma.XOR<Prisma.ResellersNullableScalarRelationFilter, Prisma.resellersWhereInput> | null
 }
 
@@ -363,6 +365,8 @@ export type usersOrderByWithRelationInput = {
   usage_stats?: Prisma.usage_statsOrderByRelationAggregateInput
   user_assets?: Prisma.user_assetsOrderByRelationAggregateInput
   user_credits?: Prisma.user_creditsOrderByWithRelationInput
+  user_voices?: Prisma.user_voicesOrderByRelationAggregateInput
+  user_characters?: Prisma.user_charactersOrderByRelationAggregateInput
   resellers_users_resellerIdToresellers?: Prisma.resellersOrderByWithRelationInput
 }
 
@@ -400,6 +404,8 @@ export type usersWhereUniqueInput = Prisma.AtLeast<{
   usage_stats?: Prisma.Usage_statsListRelationFilter
   user_assets?: Prisma.User_assetsListRelationFilter
   user_credits?: Prisma.XOR<Prisma.User_creditsNullableScalarRelationFilter, Prisma.user_creditsWhereInput> | null
+  user_voices?: Prisma.User_voicesListRelationFilter
+  user_characters?: Prisma.User_charactersListRelationFilter
   resellers_users_resellerIdToresellers?: Prisma.XOR<Prisma.ResellersNullableScalarRelationFilter, Prisma.resellersWhereInput> | null
 }, "id" | "email" | "referralCode">
 
@@ -481,6 +487,8 @@ export type usersCreateInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -515,6 +523,8 @@ export type usersUncheckedCreateInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersUpdateInput = {
@@ -547,6 +557,8 @@ export type usersUpdateInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -581,6 +593,8 @@ export type usersUncheckedUpdateInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateManyInput = {
@@ -951,6 +965,34 @@ export type usersUpdateOneRequiredWithoutUser_creditsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.usersUpdateToOneWithWhereWithoutUser_creditsInput, Prisma.usersUpdateWithoutUser_creditsInput>, Prisma.usersUncheckedUpdateWithoutUser_creditsInput>
 }
 
+export type usersCreateNestedOneWithoutUser_voicesInput = {
+  create?: Prisma.XOR<Prisma.usersCreateWithoutUser_voicesInput, Prisma.usersUncheckedCreateWithoutUser_voicesInput>
+  connectOrCreate?: Prisma.usersCreateOrConnectWithoutUser_voicesInput
+  connect?: Prisma.usersWhereUniqueInput
+}
+
+export type usersUpdateOneRequiredWithoutUser_voicesNestedInput = {
+  create?: Prisma.XOR<Prisma.usersCreateWithoutUser_voicesInput, Prisma.usersUncheckedCreateWithoutUser_voicesInput>
+  connectOrCreate?: Prisma.usersCreateOrConnectWithoutUser_voicesInput
+  upsert?: Prisma.usersUpsertWithoutUser_voicesInput
+  connect?: Prisma.usersWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.usersUpdateToOneWithWhereWithoutUser_voicesInput, Prisma.usersUpdateWithoutUser_voicesInput>, Prisma.usersUncheckedUpdateWithoutUser_voicesInput>
+}
+
+export type usersCreateNestedOneWithoutUser_charactersInput = {
+  create?: Prisma.XOR<Prisma.usersCreateWithoutUser_charactersInput, Prisma.usersUncheckedCreateWithoutUser_charactersInput>
+  connectOrCreate?: Prisma.usersCreateOrConnectWithoutUser_charactersInput
+  connect?: Prisma.usersWhereUniqueInput
+}
+
+export type usersUpdateOneRequiredWithoutUser_charactersNestedInput = {
+  create?: Prisma.XOR<Prisma.usersCreateWithoutUser_charactersInput, Prisma.usersUncheckedCreateWithoutUser_charactersInput>
+  connectOrCreate?: Prisma.usersCreateOrConnectWithoutUser_charactersInput
+  upsert?: Prisma.usersUpsertWithoutUser_charactersInput
+  connect?: Prisma.usersWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.usersUpdateToOneWithWhereWithoutUser_charactersInput, Prisma.usersUpdateWithoutUser_charactersInput>, Prisma.usersUncheckedUpdateWithoutUser_charactersInput>
+}
+
 export type usersCreateWithoutAccountsInput = {
   id: string
   name?: string | null
@@ -980,6 +1022,8 @@ export type usersCreateWithoutAccountsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1013,6 +1057,8 @@ export type usersUncheckedCreateWithoutAccountsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutAccountsInput = {
@@ -1060,6 +1106,8 @@ export type usersUpdateWithoutAccountsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -1093,6 +1141,8 @@ export type usersUncheckedUpdateWithoutAccountsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutApi_keysInput = {
@@ -1124,6 +1174,8 @@ export type usersCreateWithoutApi_keysInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1157,6 +1209,8 @@ export type usersUncheckedCreateWithoutApi_keysInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutApi_keysInput = {
@@ -1204,6 +1258,8 @@ export type usersUpdateWithoutApi_keysInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -1237,6 +1293,8 @@ export type usersUncheckedUpdateWithoutApi_keysInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutCredit_transactionsInput = {
@@ -1268,6 +1326,8 @@ export type usersCreateWithoutCredit_transactionsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1301,6 +1361,8 @@ export type usersUncheckedCreateWithoutCredit_transactionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutCredit_transactionsInput = {
@@ -1348,6 +1410,8 @@ export type usersUpdateWithoutCredit_transactionsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -1381,6 +1445,8 @@ export type usersUncheckedUpdateWithoutCredit_transactionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutGallery_itemsInput = {
@@ -1412,6 +1478,8 @@ export type usersCreateWithoutGallery_itemsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1445,6 +1513,8 @@ export type usersUncheckedCreateWithoutGallery_itemsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutGallery_itemsInput = {
@@ -1492,6 +1562,8 @@ export type usersUpdateWithoutGallery_itemsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -1525,6 +1597,8 @@ export type usersUncheckedUpdateWithoutGallery_itemsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutReferralsInput = {
@@ -1556,6 +1630,8 @@ export type usersCreateWithoutReferralsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1589,6 +1665,8 @@ export type usersUncheckedCreateWithoutReferralsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutReferralsInput = {
@@ -1636,6 +1714,8 @@ export type usersUpdateWithoutReferralsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -1669,6 +1749,8 @@ export type usersUncheckedUpdateWithoutReferralsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutResellers_resellers_userIdTousersInput = {
@@ -1700,6 +1782,8 @@ export type usersCreateWithoutResellers_resellers_userIdTousersInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1733,6 +1817,8 @@ export type usersUncheckedCreateWithoutResellers_resellers_userIdTousersInput = 
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutResellers_resellers_userIdTousersInput = {
@@ -1770,6 +1856,8 @@ export type usersCreateWithoutResellers_users_resellerIdToresellersInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
 }
 
 export type usersUncheckedCreateWithoutResellers_users_resellerIdToresellersInput = {
@@ -1802,6 +1890,8 @@ export type usersUncheckedCreateWithoutResellers_users_resellerIdToresellersInpu
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutResellers_users_resellerIdToresellersInput = {
@@ -1854,6 +1944,8 @@ export type usersUpdateWithoutResellers_resellers_userIdTousersInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -1887,6 +1979,8 @@ export type usersUncheckedUpdateWithoutResellers_resellers_userIdTousersInput = 
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersUpsertWithWhereUniqueWithoutResellers_users_resellerIdToresellersInput = {
@@ -1957,6 +2051,8 @@ export type usersCreateWithoutSessionsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -1990,6 +2086,8 @@ export type usersUncheckedCreateWithoutSessionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutSessionsInput = {
@@ -2037,6 +2135,8 @@ export type usersUpdateWithoutSessionsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2070,6 +2170,8 @@ export type usersUncheckedUpdateWithoutSessionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutSubscriptionsInput = {
@@ -2101,6 +2203,8 @@ export type usersCreateWithoutSubscriptionsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -2134,6 +2238,8 @@ export type usersUncheckedCreateWithoutSubscriptionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutSubscriptionsInput = {
@@ -2181,6 +2287,8 @@ export type usersUpdateWithoutSubscriptionsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2214,6 +2322,8 @@ export type usersUncheckedUpdateWithoutSubscriptionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutTransactionsInput = {
@@ -2245,6 +2355,8 @@ export type usersCreateWithoutTransactionsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -2278,6 +2390,8 @@ export type usersUncheckedCreateWithoutTransactionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutTransactionsInput = {
@@ -2325,6 +2439,8 @@ export type usersUpdateWithoutTransactionsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2358,6 +2474,8 @@ export type usersUncheckedUpdateWithoutTransactionsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutUpscale_itemsInput = {
@@ -2389,6 +2507,8 @@ export type usersCreateWithoutUpscale_itemsInput = {
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -2422,6 +2542,8 @@ export type usersUncheckedCreateWithoutUpscale_itemsInput = {
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutUpscale_itemsInput = {
@@ -2469,6 +2591,8 @@ export type usersUpdateWithoutUpscale_itemsInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2502,6 +2626,8 @@ export type usersUncheckedUpdateWithoutUpscale_itemsInput = {
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutUsage_statsInput = {
@@ -2533,6 +2659,8 @@ export type usersCreateWithoutUsage_statsInput = {
   upscale_items?: Prisma.upscale_itemsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -2566,6 +2694,8 @@ export type usersUncheckedCreateWithoutUsage_statsInput = {
   upscale_items?: Prisma.upscale_itemsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutUsage_statsInput = {
@@ -2613,6 +2743,8 @@ export type usersUpdateWithoutUsage_statsInput = {
   upscale_items?: Prisma.upscale_itemsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2646,6 +2778,8 @@ export type usersUncheckedUpdateWithoutUsage_statsInput = {
   upscale_items?: Prisma.upscale_itemsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutUser_assetsInput = {
@@ -2677,6 +2811,8 @@ export type usersCreateWithoutUser_assetsInput = {
   upscale_items?: Prisma.upscale_itemsCreateNestedManyWithoutUsersInput
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -2710,6 +2846,8 @@ export type usersUncheckedCreateWithoutUser_assetsInput = {
   upscale_items?: Prisma.upscale_itemsUncheckedCreateNestedManyWithoutUsersInput
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutUser_assetsInput = {
@@ -2757,6 +2895,8 @@ export type usersUpdateWithoutUser_assetsInput = {
   upscale_items?: Prisma.upscale_itemsUpdateManyWithoutUsersNestedInput
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2790,6 +2930,8 @@ export type usersUncheckedUpdateWithoutUser_assetsInput = {
   upscale_items?: Prisma.upscale_itemsUncheckedUpdateManyWithoutUsersNestedInput
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateWithoutUser_creditsInput = {
@@ -2821,6 +2963,8 @@ export type usersCreateWithoutUser_creditsInput = {
   upscale_items?: Prisma.upscale_itemsCreateNestedManyWithoutUsersInput
   usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
   resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
 }
 
@@ -2854,6 +2998,8 @@ export type usersUncheckedCreateWithoutUser_creditsInput = {
   upscale_items?: Prisma.upscale_itemsUncheckedCreateNestedManyWithoutUsersInput
   usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
   user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
 }
 
 export type usersCreateOrConnectWithoutUser_creditsInput = {
@@ -2901,6 +3047,8 @@ export type usersUpdateWithoutUser_creditsInput = {
   upscale_items?: Prisma.upscale_itemsUpdateManyWithoutUsersNestedInput
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
   resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
 }
 
@@ -2934,6 +3082,312 @@ export type usersUncheckedUpdateWithoutUser_creditsInput = {
   upscale_items?: Prisma.upscale_itemsUncheckedUpdateManyWithoutUsersNestedInput
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
+}
+
+export type usersCreateWithoutUser_voicesInput = {
+  id: string
+  name?: string | null
+  email: string
+  emailVerified?: Date | string | null
+  password?: string | null
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt: Date | string
+  role?: string
+  discountPercent?: number
+  referralCode?: string | null
+  referredBy?: string | null
+  hasUsedTrial?: boolean
+  referralEarnings?: number
+  lastFreeCreditClaim?: Date | string | null
+  isReseller?: boolean
+  accounts?: Prisma.accountsCreateNestedManyWithoutUsersInput
+  api_keys?: Prisma.api_keysCreateNestedManyWithoutUsersInput
+  credit_transactions?: Prisma.credit_transactionsCreateNestedManyWithoutUsersInput
+  gallery_items?: Prisma.gallery_itemsCreateNestedManyWithoutUsersInput
+  referrals?: Prisma.referralsCreateNestedManyWithoutUsersInput
+  resellers_resellers_userIdTousers?: Prisma.resellersCreateNestedOneWithoutUsers_resellers_userIdTousersInput
+  sessions?: Prisma.sessionsCreateNestedManyWithoutUsersInput
+  subscriptions?: Prisma.subscriptionsCreateNestedOneWithoutUsersInput
+  transactions?: Prisma.transactionsCreateNestedManyWithoutUsersInput
+  upscale_items?: Prisma.upscale_itemsCreateNestedManyWithoutUsersInput
+  usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
+  user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
+  user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_characters?: Prisma.user_charactersCreateNestedManyWithoutUsersInput
+  resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
+}
+
+export type usersUncheckedCreateWithoutUser_voicesInput = {
+  id: string
+  name?: string | null
+  email: string
+  emailVerified?: Date | string | null
+  password?: string | null
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt: Date | string
+  role?: string
+  discountPercent?: number
+  referralCode?: string | null
+  referredBy?: string | null
+  hasUsedTrial?: boolean
+  referralEarnings?: number
+  lastFreeCreditClaim?: Date | string | null
+  isReseller?: boolean
+  resellerId?: string | null
+  accounts?: Prisma.accountsUncheckedCreateNestedManyWithoutUsersInput
+  api_keys?: Prisma.api_keysUncheckedCreateNestedManyWithoutUsersInput
+  credit_transactions?: Prisma.credit_transactionsUncheckedCreateNestedManyWithoutUsersInput
+  gallery_items?: Prisma.gallery_itemsUncheckedCreateNestedManyWithoutUsersInput
+  referrals?: Prisma.referralsUncheckedCreateNestedManyWithoutUsersInput
+  resellers_resellers_userIdTousers?: Prisma.resellersUncheckedCreateNestedOneWithoutUsers_resellers_userIdTousersInput
+  sessions?: Prisma.sessionsUncheckedCreateNestedManyWithoutUsersInput
+  subscriptions?: Prisma.subscriptionsUncheckedCreateNestedOneWithoutUsersInput
+  transactions?: Prisma.transactionsUncheckedCreateNestedManyWithoutUsersInput
+  upscale_items?: Prisma.upscale_itemsUncheckedCreateNestedManyWithoutUsersInput
+  usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
+  user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
+  user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_characters?: Prisma.user_charactersUncheckedCreateNestedManyWithoutUsersInput
+}
+
+export type usersCreateOrConnectWithoutUser_voicesInput = {
+  where: Prisma.usersWhereUniqueInput
+  create: Prisma.XOR<Prisma.usersCreateWithoutUser_voicesInput, Prisma.usersUncheckedCreateWithoutUser_voicesInput>
+}
+
+export type usersUpsertWithoutUser_voicesInput = {
+  update: Prisma.XOR<Prisma.usersUpdateWithoutUser_voicesInput, Prisma.usersUncheckedUpdateWithoutUser_voicesInput>
+  create: Prisma.XOR<Prisma.usersCreateWithoutUser_voicesInput, Prisma.usersUncheckedCreateWithoutUser_voicesInput>
+  where?: Prisma.usersWhereInput
+}
+
+export type usersUpdateToOneWithWhereWithoutUser_voicesInput = {
+  where?: Prisma.usersWhereInput
+  data: Prisma.XOR<Prisma.usersUpdateWithoutUser_voicesInput, Prisma.usersUncheckedUpdateWithoutUser_voicesInput>
+}
+
+export type usersUpdateWithoutUser_voicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  discountPercent?: Prisma.IntFieldUpdateOperationsInput | number
+  referralCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  referredBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hasUsedTrial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  referralEarnings?: Prisma.IntFieldUpdateOperationsInput | number
+  lastFreeCreditClaim?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isReseller?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  accounts?: Prisma.accountsUpdateManyWithoutUsersNestedInput
+  api_keys?: Prisma.api_keysUpdateManyWithoutUsersNestedInput
+  credit_transactions?: Prisma.credit_transactionsUpdateManyWithoutUsersNestedInput
+  gallery_items?: Prisma.gallery_itemsUpdateManyWithoutUsersNestedInput
+  referrals?: Prisma.referralsUpdateManyWithoutUsersNestedInput
+  resellers_resellers_userIdTousers?: Prisma.resellersUpdateOneWithoutUsers_resellers_userIdTousersNestedInput
+  sessions?: Prisma.sessionsUpdateManyWithoutUsersNestedInput
+  subscriptions?: Prisma.subscriptionsUpdateOneWithoutUsersNestedInput
+  transactions?: Prisma.transactionsUpdateManyWithoutUsersNestedInput
+  upscale_items?: Prisma.upscale_itemsUpdateManyWithoutUsersNestedInput
+  usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
+  user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
+  user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
+  resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
+}
+
+export type usersUncheckedUpdateWithoutUser_voicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  discountPercent?: Prisma.IntFieldUpdateOperationsInput | number
+  referralCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  referredBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hasUsedTrial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  referralEarnings?: Prisma.IntFieldUpdateOperationsInput | number
+  lastFreeCreditClaim?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isReseller?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  accounts?: Prisma.accountsUncheckedUpdateManyWithoutUsersNestedInput
+  api_keys?: Prisma.api_keysUncheckedUpdateManyWithoutUsersNestedInput
+  credit_transactions?: Prisma.credit_transactionsUncheckedUpdateManyWithoutUsersNestedInput
+  gallery_items?: Prisma.gallery_itemsUncheckedUpdateManyWithoutUsersNestedInput
+  referrals?: Prisma.referralsUncheckedUpdateManyWithoutUsersNestedInput
+  resellers_resellers_userIdTousers?: Prisma.resellersUncheckedUpdateOneWithoutUsers_resellers_userIdTousersNestedInput
+  sessions?: Prisma.sessionsUncheckedUpdateManyWithoutUsersNestedInput
+  subscriptions?: Prisma.subscriptionsUncheckedUpdateOneWithoutUsersNestedInput
+  transactions?: Prisma.transactionsUncheckedUpdateManyWithoutUsersNestedInput
+  upscale_items?: Prisma.upscale_itemsUncheckedUpdateManyWithoutUsersNestedInput
+  usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
+  user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
+  user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
+}
+
+export type usersCreateWithoutUser_charactersInput = {
+  id: string
+  name?: string | null
+  email: string
+  emailVerified?: Date | string | null
+  password?: string | null
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt: Date | string
+  role?: string
+  discountPercent?: number
+  referralCode?: string | null
+  referredBy?: string | null
+  hasUsedTrial?: boolean
+  referralEarnings?: number
+  lastFreeCreditClaim?: Date | string | null
+  isReseller?: boolean
+  accounts?: Prisma.accountsCreateNestedManyWithoutUsersInput
+  api_keys?: Prisma.api_keysCreateNestedManyWithoutUsersInput
+  credit_transactions?: Prisma.credit_transactionsCreateNestedManyWithoutUsersInput
+  gallery_items?: Prisma.gallery_itemsCreateNestedManyWithoutUsersInput
+  referrals?: Prisma.referralsCreateNestedManyWithoutUsersInput
+  resellers_resellers_userIdTousers?: Prisma.resellersCreateNestedOneWithoutUsers_resellers_userIdTousersInput
+  sessions?: Prisma.sessionsCreateNestedManyWithoutUsersInput
+  subscriptions?: Prisma.subscriptionsCreateNestedOneWithoutUsersInput
+  transactions?: Prisma.transactionsCreateNestedManyWithoutUsersInput
+  upscale_items?: Prisma.upscale_itemsCreateNestedManyWithoutUsersInput
+  usage_stats?: Prisma.usage_statsCreateNestedManyWithoutUsersInput
+  user_assets?: Prisma.user_assetsCreateNestedManyWithoutUsersInput
+  user_credits?: Prisma.user_creditsCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesCreateNestedManyWithoutUsersInput
+  resellers_users_resellerIdToresellers?: Prisma.resellersCreateNestedOneWithoutUsers_users_resellerIdToresellersInput
+}
+
+export type usersUncheckedCreateWithoutUser_charactersInput = {
+  id: string
+  name?: string | null
+  email: string
+  emailVerified?: Date | string | null
+  password?: string | null
+  image?: string | null
+  createdAt?: Date | string
+  updatedAt: Date | string
+  role?: string
+  discountPercent?: number
+  referralCode?: string | null
+  referredBy?: string | null
+  hasUsedTrial?: boolean
+  referralEarnings?: number
+  lastFreeCreditClaim?: Date | string | null
+  isReseller?: boolean
+  resellerId?: string | null
+  accounts?: Prisma.accountsUncheckedCreateNestedManyWithoutUsersInput
+  api_keys?: Prisma.api_keysUncheckedCreateNestedManyWithoutUsersInput
+  credit_transactions?: Prisma.credit_transactionsUncheckedCreateNestedManyWithoutUsersInput
+  gallery_items?: Prisma.gallery_itemsUncheckedCreateNestedManyWithoutUsersInput
+  referrals?: Prisma.referralsUncheckedCreateNestedManyWithoutUsersInput
+  resellers_resellers_userIdTousers?: Prisma.resellersUncheckedCreateNestedOneWithoutUsers_resellers_userIdTousersInput
+  sessions?: Prisma.sessionsUncheckedCreateNestedManyWithoutUsersInput
+  subscriptions?: Prisma.subscriptionsUncheckedCreateNestedOneWithoutUsersInput
+  transactions?: Prisma.transactionsUncheckedCreateNestedManyWithoutUsersInput
+  upscale_items?: Prisma.upscale_itemsUncheckedCreateNestedManyWithoutUsersInput
+  usage_stats?: Prisma.usage_statsUncheckedCreateNestedManyWithoutUsersInput
+  user_assets?: Prisma.user_assetsUncheckedCreateNestedManyWithoutUsersInput
+  user_credits?: Prisma.user_creditsUncheckedCreateNestedOneWithoutUsersInput
+  user_voices?: Prisma.user_voicesUncheckedCreateNestedManyWithoutUsersInput
+}
+
+export type usersCreateOrConnectWithoutUser_charactersInput = {
+  where: Prisma.usersWhereUniqueInput
+  create: Prisma.XOR<Prisma.usersCreateWithoutUser_charactersInput, Prisma.usersUncheckedCreateWithoutUser_charactersInput>
+}
+
+export type usersUpsertWithoutUser_charactersInput = {
+  update: Prisma.XOR<Prisma.usersUpdateWithoutUser_charactersInput, Prisma.usersUncheckedUpdateWithoutUser_charactersInput>
+  create: Prisma.XOR<Prisma.usersCreateWithoutUser_charactersInput, Prisma.usersUncheckedCreateWithoutUser_charactersInput>
+  where?: Prisma.usersWhereInput
+}
+
+export type usersUpdateToOneWithWhereWithoutUser_charactersInput = {
+  where?: Prisma.usersWhereInput
+  data: Prisma.XOR<Prisma.usersUpdateWithoutUser_charactersInput, Prisma.usersUncheckedUpdateWithoutUser_charactersInput>
+}
+
+export type usersUpdateWithoutUser_charactersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  discountPercent?: Prisma.IntFieldUpdateOperationsInput | number
+  referralCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  referredBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hasUsedTrial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  referralEarnings?: Prisma.IntFieldUpdateOperationsInput | number
+  lastFreeCreditClaim?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isReseller?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  accounts?: Prisma.accountsUpdateManyWithoutUsersNestedInput
+  api_keys?: Prisma.api_keysUpdateManyWithoutUsersNestedInput
+  credit_transactions?: Prisma.credit_transactionsUpdateManyWithoutUsersNestedInput
+  gallery_items?: Prisma.gallery_itemsUpdateManyWithoutUsersNestedInput
+  referrals?: Prisma.referralsUpdateManyWithoutUsersNestedInput
+  resellers_resellers_userIdTousers?: Prisma.resellersUpdateOneWithoutUsers_resellers_userIdTousersNestedInput
+  sessions?: Prisma.sessionsUpdateManyWithoutUsersNestedInput
+  subscriptions?: Prisma.subscriptionsUpdateOneWithoutUsersNestedInput
+  transactions?: Prisma.transactionsUpdateManyWithoutUsersNestedInput
+  upscale_items?: Prisma.upscale_itemsUpdateManyWithoutUsersNestedInput
+  usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
+  user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
+  user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  resellers_users_resellerIdToresellers?: Prisma.resellersUpdateOneWithoutUsers_users_resellerIdToresellersNestedInput
+}
+
+export type usersUncheckedUpdateWithoutUser_charactersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  password?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  discountPercent?: Prisma.IntFieldUpdateOperationsInput | number
+  referralCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  referredBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hasUsedTrial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  referralEarnings?: Prisma.IntFieldUpdateOperationsInput | number
+  lastFreeCreditClaim?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isReseller?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  resellerId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  accounts?: Prisma.accountsUncheckedUpdateManyWithoutUsersNestedInput
+  api_keys?: Prisma.api_keysUncheckedUpdateManyWithoutUsersNestedInput
+  credit_transactions?: Prisma.credit_transactionsUncheckedUpdateManyWithoutUsersNestedInput
+  gallery_items?: Prisma.gallery_itemsUncheckedUpdateManyWithoutUsersNestedInput
+  referrals?: Prisma.referralsUncheckedUpdateManyWithoutUsersNestedInput
+  resellers_resellers_userIdTousers?: Prisma.resellersUncheckedUpdateOneWithoutUsers_resellers_userIdTousersNestedInput
+  sessions?: Prisma.sessionsUncheckedUpdateManyWithoutUsersNestedInput
+  subscriptions?: Prisma.subscriptionsUncheckedUpdateOneWithoutUsersNestedInput
+  transactions?: Prisma.transactionsUncheckedUpdateManyWithoutUsersNestedInput
+  upscale_items?: Prisma.upscale_itemsUncheckedUpdateManyWithoutUsersNestedInput
+  usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
+  user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
+  user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersCreateManyResellers_users_resellerIdToresellersInput = {
@@ -2985,6 +3439,8 @@ export type usersUpdateWithoutResellers_users_resellerIdToresellersInput = {
   usage_stats?: Prisma.usage_statsUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUpdateManyWithoutUsersNestedInput
 }
 
 export type usersUncheckedUpdateWithoutResellers_users_resellerIdToresellersInput = {
@@ -3017,6 +3473,8 @@ export type usersUncheckedUpdateWithoutResellers_users_resellerIdToresellersInpu
   usage_stats?: Prisma.usage_statsUncheckedUpdateManyWithoutUsersNestedInput
   user_assets?: Prisma.user_assetsUncheckedUpdateManyWithoutUsersNestedInput
   user_credits?: Prisma.user_creditsUncheckedUpdateOneWithoutUsersNestedInput
+  user_voices?: Prisma.user_voicesUncheckedUpdateManyWithoutUsersNestedInput
+  user_characters?: Prisma.user_charactersUncheckedUpdateManyWithoutUsersNestedInput
 }
 
 export type usersUncheckedUpdateManyWithoutResellers_users_resellerIdToresellersInput = {
@@ -3054,6 +3512,8 @@ export type UsersCountOutputType = {
   upscale_items: number
   usage_stats: number
   user_assets: number
+  user_voices: number
+  user_characters: number
 }
 
 export type UsersCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3067,6 +3527,8 @@ export type UsersCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   upscale_items?: boolean | UsersCountOutputTypeCountUpscale_itemsArgs
   usage_stats?: boolean | UsersCountOutputTypeCountUsage_statsArgs
   user_assets?: boolean | UsersCountOutputTypeCountUser_assetsArgs
+  user_voices?: boolean | UsersCountOutputTypeCountUser_voicesArgs
+  user_characters?: boolean | UsersCountOutputTypeCountUser_charactersArgs
 }
 
 /**
@@ -3149,6 +3611,20 @@ export type UsersCountOutputTypeCountUser_assetsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.user_assetsWhereInput
 }
 
+/**
+ * UsersCountOutputType without action
+ */
+export type UsersCountOutputTypeCountUser_voicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.user_voicesWhereInput
+}
+
+/**
+ * UsersCountOutputType without action
+ */
+export type UsersCountOutputTypeCountUser_charactersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.user_charactersWhereInput
+}
+
 
 export type usersSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -3181,6 +3657,8 @@ export type usersSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   usage_stats?: boolean | Prisma.users$usage_statsArgs<ExtArgs>
   user_assets?: boolean | Prisma.users$user_assetsArgs<ExtArgs>
   user_credits?: boolean | Prisma.users$user_creditsArgs<ExtArgs>
+  user_voices?: boolean | Prisma.users$user_voicesArgs<ExtArgs>
+  user_characters?: boolean | Prisma.users$user_charactersArgs<ExtArgs>
   resellers_users_resellerIdToresellers?: boolean | Prisma.users$resellers_users_resellerIdToresellersArgs<ExtArgs>
   _count?: boolean | Prisma.UsersCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["users"]>
@@ -3262,6 +3740,8 @@ export type usersInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   usage_stats?: boolean | Prisma.users$usage_statsArgs<ExtArgs>
   user_assets?: boolean | Prisma.users$user_assetsArgs<ExtArgs>
   user_credits?: boolean | Prisma.users$user_creditsArgs<ExtArgs>
+  user_voices?: boolean | Prisma.users$user_voicesArgs<ExtArgs>
+  user_characters?: boolean | Prisma.users$user_charactersArgs<ExtArgs>
   resellers_users_resellerIdToresellers?: boolean | Prisma.users$resellers_users_resellerIdToresellersArgs<ExtArgs>
   _count?: boolean | Prisma.UsersCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -3288,6 +3768,8 @@ export type $usersPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     usage_stats: Prisma.$usage_statsPayload<ExtArgs>[]
     user_assets: Prisma.$user_assetsPayload<ExtArgs>[]
     user_credits: Prisma.$user_creditsPayload<ExtArgs> | null
+    user_voices: Prisma.$user_voicesPayload<ExtArgs>[]
+    user_characters: Prisma.$user_charactersPayload<ExtArgs>[]
     resellers_users_resellerIdToresellers: Prisma.$resellersPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -3715,6 +4197,8 @@ export interface Prisma__usersClient<T, Null = never, ExtArgs extends runtime.Ty
   usage_stats<T extends Prisma.users$usage_statsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.users$usage_statsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$usage_statsPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   user_assets<T extends Prisma.users$user_assetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.users$user_assetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$user_assetsPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   user_credits<T extends Prisma.users$user_creditsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.users$user_creditsArgs<ExtArgs>>): Prisma.Prisma__user_creditsClient<runtime.Types.Result.GetResult<Prisma.$user_creditsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  user_voices<T extends Prisma.users$user_voicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.users$user_voicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$user_voicesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  user_characters<T extends Prisma.users$user_charactersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.users$user_charactersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$user_charactersPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   resellers_users_resellerIdToresellers<T extends Prisma.users$resellers_users_resellerIdToresellersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.users$resellers_users_resellerIdToresellersArgs<ExtArgs>>): Prisma.Prisma__resellersClient<runtime.Types.Result.GetResult<Prisma.$resellersPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -4457,6 +4941,54 @@ export type users$user_creditsArgs<ExtArgs extends runtime.Types.Extensions.Inte
    */
   include?: Prisma.user_creditsInclude<ExtArgs> | null
   where?: Prisma.user_creditsWhereInput
+}
+
+/**
+ * users.user_voices
+ */
+export type users$user_voicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the user_voices
+   */
+  select?: Prisma.user_voicesSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the user_voices
+   */
+  omit?: Prisma.user_voicesOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.user_voicesInclude<ExtArgs> | null
+  where?: Prisma.user_voicesWhereInput
+  orderBy?: Prisma.user_voicesOrderByWithRelationInput | Prisma.user_voicesOrderByWithRelationInput[]
+  cursor?: Prisma.user_voicesWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.User_voicesScalarFieldEnum | Prisma.User_voicesScalarFieldEnum[]
+}
+
+/**
+ * users.user_characters
+ */
+export type users$user_charactersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the user_characters
+   */
+  select?: Prisma.user_charactersSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the user_characters
+   */
+  omit?: Prisma.user_charactersOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.user_charactersInclude<ExtArgs> | null
+  where?: Prisma.user_charactersWhereInput
+  orderBy?: Prisma.user_charactersOrderByWithRelationInput | Prisma.user_charactersOrderByWithRelationInput[]
+  cursor?: Prisma.user_charactersWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.User_charactersScalarFieldEnum | Prisma.User_charactersScalarFieldEnum[]
 }
 
 /**

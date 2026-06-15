@@ -137,3 +137,13 @@ export type verification_tokens = Prisma.verification_tokensModel
  * 
  */
 export type promo_codes = Prisma.promo_codesModel
+/**
+ * Model user_voices
+ * 
+ */
+export type user_voices = Prisma.user_voicesModel
+/**
+ * Model user_characters
+ * 
+ */
+export type user_characters = Prisma.user_charactersModel

@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     const {
       prompt, model, aspectRatio, duration, count, seed,
       startImage, endImage, referenceImages, voice, email,
-      feature,
+      feature, characters,
     } = body
 
     const useAsync = body.async === true
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
     // Check credit balance
     const videoCount = count || 1
     const modelToUse = model || "veo-3.1-lite-low-priority"
-    const costPerVideo = modelToUse === "omni-flash" ? 100 : CREDIT_COST_VIDEO
+    const costPerVideo = modelToUse === "omni-flash" ? 50 : CREDIT_COST_VIDEO
     const requiredCredits = videoCount * costPerVideo
     const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
     const currentBalance = credits?.balance ?? 0
@@ -194,6 +194,12 @@ export async function POST(req: NextRequest) {
     if (referenceImages && Array.isArray(referenceImages)) {
       referenceImages.forEach((ref: string, i: number) => {
         basePayload[`referenceImage_${i + 1}`] = ref
+      })
+    }
+
+    if (characters && Array.isArray(characters)) {
+      characters.forEach((charRef: string, i: number) => {
+        basePayload[`character_${i + 1}`] = charRef
       })
     }
 
@@ -283,7 +289,7 @@ async function handlePostResponse(
     // Sync mode: UseAPI returned the full result. Deduct credits and return.
     const media = extractMedia(data)
     console.log(`[video-generate] Sync job done: ${useapiJobId}, videos=${media.length}`)
-    const costPerVideo = feature === "omni-flash" ? 100 : CREDIT_COST_VIDEO
+    const costPerVideo = feature === "omni-flash" ? 50 : CREDIT_COST_VIDEO
     const deducted = await deductCredits(userId, videoCount * costPerVideo, feature)
     return NextResponse.json({ jobId: useapiJobId || "", status: "done", media, creditsDeducted: deducted })
   }
@@ -370,7 +376,7 @@ export async function GET(req: NextRequest) {
       if (!deductedJobs.has(deductKey)) {
         const videoCount = media.length || 1
         const feat = (data.request as Record<string, unknown>)?.model as string || "video-generator"
-        const costPerVideo = feat === "omni-flash" ? 100 : CREDIT_COST_VIDEO
+        const costPerVideo = feat === "omni-flash" ? 50 : CREDIT_COST_VIDEO
         creditsDeducted = await deductCredits(session.user.id, videoCount * costPerVideo, `video-${feat}`)
         deductedJobs.set(deductKey, Date.now())
       }

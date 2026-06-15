@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { prompt, model, aspectRatio, count, seed, references, email } = body
+    const { prompt, model, aspectRatio, count, seed, references, characters, email } = body
     const useAsync = body.async === true
 
     if (!prompt) {
@@ -152,6 +152,19 @@ export async function POST(req: NextRequest) {
       references.forEach((ref: string, i: number) => {
         basePayload[`reference_${i + 1}`] = ref
       })
+    }
+
+    // Character refs → character_1..7 (separate from reference images)
+    if (characters && Array.isArray(characters)) {
+      characters.forEach((charRef: string, i: number) => {
+        basePayload[`character_${i + 1}`] = charRef
+      })
+    }
+    // Also forward character_N keys sent directly by the generation queue
+    for (const key of Object.keys(body)) {
+      if (/^character_\d+$/.test(key) && !basePayload[key]) {
+        basePayload[key] = body[key]
+      }
     }
 
     const feature = "image-generator"

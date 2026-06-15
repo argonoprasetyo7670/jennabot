@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
   if (!DEDUCTED_KEYS.has(deductKey)) {
     const meta = await getVideoJobMeta(jobId)
     if (meta) {
-      const costPerVideo = meta.feature === "omni-flash" ? 100 : 5 // CREDIT_COST_VIDEO = 5
+      const costPerVideo = meta.feature === "omni-flash" ? 50 : 5 // CREDIT_COST_VIDEO = 5
       const amount = meta.videoCount * costPerVideo
       creditsDeducted = await deductCredits(meta.userId, amount, meta.feature)
       DEDUCTED_KEYS.add(deductKey)

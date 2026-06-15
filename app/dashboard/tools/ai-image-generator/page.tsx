@@ -15,6 +15,7 @@ import {
   ImageIcon,
   ArrowUpCircleIcon,
   Settings2Icon,
+  UsersIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DashboardHeader } from "@/components/dashboard-header"
@@ -22,6 +23,7 @@ import { LottieLoading } from "@/components/lottie-loading"
 import { useGenerationQueue, type GenerationJob, CREDIT_COST_IMAGE } from "@/contexts/generation-queue"
 import type { ImageModel, AspectRatio, GeneratedImage } from "@/lib/api/google-flow"
 import { upscaleImage, downloadBase64Image } from "@/lib/api/google-flow"
+import { getCharactersAndVoices } from "@/app/dashboard/characters/actions"
 
 /* ─── Constants ─── */
 const ASPECT_RATIOS: AspectRatio[] = ["16:9", "4:3", "1:1", "3:4", "9:16"]
@@ -46,6 +48,14 @@ interface GalleryItem {
   prompt?: string
 }
 
+interface CharacterItem {
+  id: string
+  characterRefId: string
+  displayName: string
+  imageUrl1?: string | null
+  imageUrl2?: string | null
+}
+
 export default function AIImageGeneratorPage() {
   const [selectedRatio, setSelectedRatio] = useState(4) // 9:16 default
   const [selectedCount, setSelectedCount] = useState(1)
@@ -64,6 +74,12 @@ export default function AIImageGeneratorPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const plusMenuRef = useRef<HTMLDivElement>(null)
+
+  // Character picker state
+  const [showCharacterPicker, setShowCharacterPicker] = useState(false)
+  const [characterList, setCharacterList] = useState<CharacterItem[]>([])
+  const [characterLoading, setCharacterLoading] = useState(false)
+  const [selectedCharacters, setSelectedCharacters] = useState<CharacterItem[]>([])
 
   const { jobs, submitJob } = useGenerationQueue()
 
@@ -101,6 +117,39 @@ export default function AIImageGeneratorPage() {
     return () => document.removeEventListener("mousedown", handleClick)
   }, [showPlusMenu])
 
+  // Fetch characters for picker
+  const openCharacterPicker = useCallback(async () => {
+    setShowPlusMenu(false)
+    setShowCharacterPicker(true)
+    setCharacterLoading(true)
+    try {
+      const { characters } = await getCharactersAndVoices()
+      setCharacterList(characters as CharacterItem[])
+    } catch { /* ignore */ } finally {
+      setCharacterLoading(false)
+    }
+  }, [])
+
+  const toggleCharacter = (char: CharacterItem) => {
+    const exists = selectedCharacters.find(c => c.characterRefId === char.characterRefId)
+    const mention = `[${char.displayName}]`
+
+    if (exists) {
+      setSelectedCharacters(prev => prev.filter(c => c.characterRefId !== char.characterRefId))
+      setPrompt(p => p.replace(mention, '').replace(/\s{2,}/g, ' ').trim())
+    } else {
+      setSelectedCharacters(prev => [...prev, char])
+      setPrompt(p => {
+        const trimmed = p.trim()
+        return trimmed ? `${mention} ${trimmed}` : mention
+      })
+    }
+  }
+
+  const removeCharacter = (refId: string) => {
+    setSelectedCharacters(prev => prev.filter(c => c.characterRefId !== refId))
+  }
+
   const handleGenerate = () => {
     if (!prompt.trim() || isGenerating) return
     setShowSettings(false)
@@ -111,12 +160,16 @@ export default function AIImageGeneratorPage() {
       galleryUrl: ref.galleryUrl,
     }))
 
+    // Collect character ref IDs
+    const charRefs = selectedCharacters.map(c => c.characterRefId)
+
     const jobId = submitJob(
       {
         prompt: prompt.trim(),
         model: currentModel.id,
         aspectRatio: ASPECT_RATIOS[selectedRatio],
         count: IMAGE_COUNTS[selectedCount],
+        characters: charRefs.length > 0 ? charRefs : undefined,
       },
       refs.length > 0 ? refs : undefined
     )
@@ -124,30 +177,8 @@ export default function AIImageGeneratorPage() {
     setActiveJobId(jobId)
   }
 
-  // Auto-save all images to gallery when job completes
-  useEffect(() => {
-    if (activeJob?.status !== "done") return
-    const images = activeJob.images || []
-    images.forEach(img => {
-      if (!img.url || savedImages.has(img.url)) return
-      fetch("/api/gallery/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: img.url,
-          type: "image",
-          prompt: activeJob.prompt || "",
-          model: activeJob.model || "",
-          aspectRatio: img.aspectRatio || "",
-          mediaGenerationId: img.mediaGenerationId || "",
-          sourceAction: "image-generator",
-        }),
-      }).then(res => {
-        if (res.ok) setSavedImages(prev => new Set(prev).add(img.url))
-      }).catch(() => {})
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeJob?.status])
+  // NOTE: Auto-save to gallery is handled by GenerationQueueProvider (contexts/generation-queue.tsx).
+  // Do NOT add page-level auto-save here — it causes duplicates.
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -364,10 +395,32 @@ export default function AIImageGeneratorPage() {
         </div>
 
         <div className="mx-auto max-w-3xl px-4 pb-4">
-          {referenceImages.length > 0 && (
+          {(referenceImages.length > 0 || selectedCharacters.length > 0) && (
             <div className="flex gap-2 mb-2 px-1 overflow-x-auto pb-1">
+              {/* Selected Characters */}
+              {selectedCharacters.map((char) => (
+                <div key={char.characterRefId} className="relative h-14 shrink-0 overflow-hidden rounded-xl border-2 border-violet-500/40 bg-violet-500/5 flex items-center gap-1.5 px-2">
+                  {char.imageUrl1 ? (
+                    <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+                      <Image src={char.imageUrl1} alt={char.displayName} fill className="object-cover" unoptimized />
+                    </div>
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/20">
+                      <UsersIcon className="h-4 w-4 text-violet-400" />
+                    </div>
+                  )}
+                  <span className="text-[10px] font-medium text-violet-300 max-w-[60px] truncate">{char.displayName}</span>
+                  <button onClick={() => removeCharacter(char.characterRefId)} className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white text-[8px] shadow-sm">
+                    <XIcon className="h-2.5 w-2.5" />
+                  </button>
+                  <div className="absolute bottom-0 inset-x-0 bg-violet-500/30 text-center">
+                    <span className="text-[7px] text-white/80">Character</span>
+                  </div>
+                </div>
+              ))}
+              {/* Reference Images */}
               {referenceImages.map((ref, i) => (
-                <div key={i} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
+                <div key={`ref-${i}`} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
                   <Image src={ref.preview} alt={`Ref ${i + 1}`} fill className="object-cover" unoptimized />
                   <button onClick={() => removeReference(i)} className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white text-[8px] shadow-sm">
                     <XIcon className="h-2.5 w-2.5" />
@@ -401,6 +454,13 @@ export default function AIImageGeneratorPage() {
                   <button onClick={openGalleryPicker} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground">
                     <ImageIcon className="h-4 w-4" />
                     <span>Pilih dari Gallery</span>
+                  </button>
+                  <button onClick={openCharacterPicker} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-muted-foreground transition hover:bg-violet-500/10 hover:text-violet-400">
+                    <UsersIcon className="h-4 w-4" />
+                    <span>Pilih Character</span>
+                    {selectedCharacters.length > 0 && (
+                      <span className="ml-auto rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold text-violet-400">{selectedCharacters.length}</span>
+                    )}
                   </button>
                 </div>
               )}
@@ -601,6 +661,83 @@ export default function AIImageGeneratorPage() {
                   </button>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Character Picker Dialog ── */}
+      {showCharacterPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCharacterPicker(false)}>
+          <div className="relative w-full max-w-lg max-h-[80vh] rounded-2xl border border-violet-500/20 bg-card p-4 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <UsersIcon className="h-4 w-4 text-violet-400" />
+                <h3 className="text-sm font-semibold text-foreground">Pilih Character</h3>
+              </div>
+              <button onClick={() => setShowCharacterPicker(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground">
+                <XIcon className="h-4 w-4" />
+              </button>
+            </div>
+            {characterLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2Icon className="h-6 w-6 text-violet-400 animate-spin" />
+              </div>
+            ) : characterList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <UsersIcon className="h-8 w-8 mb-2 opacity-30" />
+                <p className="text-sm">Belum ada character</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Buat character dulu di halaman Characters</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto max-h-[55vh] pr-1">
+                  {characterList.map((char) => {
+                    const isSelected = selectedCharacters.some(c => c.characterRefId === char.characterRefId)
+                    return (
+                      <button
+                        key={char.id}
+                        onClick={() => toggleCharacter(char)}
+                        className={cn(
+                          "group relative overflow-hidden rounded-xl border-2 transition-all",
+                          isSelected
+                            ? "border-violet-500 bg-violet-500/10 ring-2 ring-violet-500/20"
+                            : "border-border bg-muted/20 hover:border-violet-500/30 hover:bg-violet-500/5"
+                        )}
+                      >
+                        <div className="aspect-square relative bg-muted/30">
+                          {char.imageUrl1 ? (
+                            <Image src={char.imageUrl1} alt={char.displayName} fill className="object-cover" unoptimized />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <UsersIcon className="h-8 w-8 text-muted-foreground/20" />
+                            </div>
+                          )}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-white">
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className="text-xs font-medium text-foreground truncate">{char.displayName}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+                  <span className="text-[11px] text-muted-foreground">
+                    {selectedCharacters.length} character dipilih
+                  </span>
+                  <button
+                    onClick={() => setShowCharacterPicker(false)}
+                    className="rounded-lg bg-violet-500 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-violet-600"
+                  >
+                    Selesai
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -74,7 +74,9 @@ export const ModelName = {
   user_credits: 'user_credits',
   users: 'users',
   verification_tokens: 'verification_tokens',
-  promo_codes: 'promo_codes'
+  promo_codes: 'promo_codes',
+  user_voices: 'user_voices',
+  user_characters: 'user_characters'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -498,6 +500,46 @@ export const Promo_codesScalarFieldEnum = {
 } as const
 
 export type Promo_codesScalarFieldEnum = (typeof Promo_codesScalarFieldEnum)[keyof typeof Promo_codesScalarFieldEnum]
+
+
+export const User_voicesScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  voiceRefId: 'voiceRefId',
+  displayName: 'displayName',
+  baseVoice: 'baseVoice',
+  dialog: 'dialog',
+  voicePerformance: 'voicePerformance',
+  audioUrl: 'audioUrl',
+  workflowId: 'workflowId',
+  mediaId: 'mediaId',
+  email: 'email',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type User_voicesScalarFieldEnum = (typeof User_voicesScalarFieldEnum)[keyof typeof User_voicesScalarFieldEnum]
+
+
+export const User_charactersScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  characterRefId: 'characterRefId',
+  entityId: 'entityId',
+  displayName: 'displayName',
+  personalityNotes: 'personalityNotes',
+  imageRef1: 'imageRef1',
+  imageRef2: 'imageRef2',
+  imageUrl1: 'imageUrl1',
+  imageUrl2: 'imageUrl2',
+  voiceType: 'voiceType',
+  voiceValue: 'voiceValue',
+  email: 'email',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type User_charactersScalarFieldEnum = (typeof User_charactersScalarFieldEnum)[keyof typeof User_charactersScalarFieldEnum]
 
 
 export const SortOrder = {

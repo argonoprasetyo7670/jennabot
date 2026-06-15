@@ -81,14 +81,18 @@ export function useVideoGenerateNode(
       // Frame/start mode → startImage (I2V, may cap at 4s on lite)
       const isReferenceMode = imageMode === "reference"
 
+      const selectedCharacters = (nodeData._selectedCharacters as { characterRefId: string, displayName: string, imageUrl1?: string }[]) || []
+      const characters = selectedCharacters.map(c => c.characterRefId)
+
       const result = await generateVideos({
         prompt: activePrompt.trim(),
-        model: model as "veo-3.1-lite-low-priority",
+        model: model as "veo-3.1-lite-low-priority" | "omni-flash",
         aspectRatio: toVideoAspect(aspectRatio),
-        duration: toDurationSeconds(duration) as 8,
+        duration: toDurationSeconds(duration) as 4 | 6 | 8 | 10,
         ...(startImageId && !isReferenceMode ? { startImage: startImageId } : {}),
         ...(endImageId && !isReferenceMode ? { endImage: endImageId } : {}),
         ...(startImageId && isReferenceMode ? { referenceImages: [startImageId] } : {}),
+        ...(characters.length > 0 ? { characters } : {}),
         ...(email ? { email } : {}),
       })
 

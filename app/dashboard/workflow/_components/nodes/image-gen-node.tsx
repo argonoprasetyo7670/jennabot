@@ -7,13 +7,22 @@ import {
   ImageIcon, Loader2Icon, PlayIcon,
   XCircleIcon, XIcon, CheckCircle2Icon, DownloadIcon,
   FolderPlusIcon, MonitorIcon, MoreHorizontalIcon, HashIcon,
-  SparklesIcon, PlusIcon, PencilIcon, CopyIcon
+  SparklesIcon, PlusIcon, PencilIcon, CopyIcon, UsersIcon
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NodeShell, getPortColor } from "../node-shell"
 import { useConnectedPrompt, useAllConnectedValues } from "../use-connected-value"
 import { useImageGenerateNode } from "../hooks/use-image-generate-node"
 import { IMAGE_MODELS, IMAGE_ASPECT_RATIOS, DEFAULTS } from "../node-defaults"
+import { getCharactersAndVoices } from "@/app/dashboard/characters/actions"
+
+interface CharacterItem {
+  id: string
+  characterRefId: string
+  displayName: string
+  imageUrl1?: string | null
+  imageUrl2?: string | null
+}
 
 export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps) {
   const nodeData = data as Record<string, unknown>
@@ -55,6 +64,45 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
     setMenuOpen(false)
     setIsEditingTitle(true)
   }, [])
+
+  // Character picker state
+  const [showCharacterPicker, setShowCharacterPicker] = useState(false)
+  const [characterList, setCharacterList] = useState<CharacterItem[]>([])
+  const [characterLoading, setCharacterLoading] = useState(false)
+  
+  const selectedCharacters = (nodeData._selectedCharacters as CharacterItem[]) || []
+
+  const openCharacterPicker = useCallback(async () => {
+    setShowCharacterPicker(true)
+    setCharacterLoading(true)
+    try {
+      const { characters } = await getCharactersAndVoices()
+      setCharacterList(characters as CharacterItem[])
+    } catch { /* ignore */ } finally {
+      setCharacterLoading(false)
+    }
+  }, [])
+
+  const toggleCharacter = (char: CharacterItem) => {
+    const exists = selectedCharacters.find(c => c.characterRefId === char.characterRefId)
+    const mention = `[${char.displayName}]`
+    
+    let newChars
+    if (exists) {
+      newChars = selectedCharacters.filter(c => c.characterRefId !== char.characterRefId)
+      setLocalPrompt(localPrompt.replace(mention, '').replace(/\s{2,}/g, ' ').trim())
+    } else {
+      newChars = [...selectedCharacters, char]
+      const trimmed = localPrompt.trim()
+      setLocalPrompt(trimmed ? `${mention} ${trimmed}` : mention)
+    }
+    updateNodeData(nodeId, { _selectedCharacters: newChars })
+  }
+
+  const removeCharacter = (refId: string) => {
+    const updated = selectedCharacters.filter(c => c.characterRefId !== refId)
+    updateNodeData(nodeId, { _selectedCharacters: updated })
+  }
 
   const connectedPrompt = useConnectedPrompt()
 
@@ -248,9 +296,28 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
             </div>
           </div>
 
-          {/* ─── Uploaded Reference Thumbnails ─── */}
-          {refImages.length > 0 && (
+          {/* ─── Uploaded Reference & Character Thumbnails ─── */}
+          {(refImages.length > 0 || selectedCharacters.length > 0) && (
             <div className="px-4 pb-2 flex items-center gap-1.5 flex-wrap">
+              {/* Selected Characters */}
+              {selectedCharacters.map((char) => (
+                <div key={char.characterRefId} className="relative group flex h-10 items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-2">
+                  {char.imageUrl1 ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={char.imageUrl1} alt={char.displayName} className="h-6 w-6 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-6 w-6 items-center justify-center rounded bg-violet-500/20">
+                      <UsersIcon className="h-3 w-3 text-violet-400" />
+                    </div>
+                  )}
+                  <span className="text-[10px] font-medium text-violet-300 max-w-[50px] truncate">{char.displayName}</span>
+                  <button onClick={(e) => { e.stopPropagation(); removeCharacter(char.characterRefId) }}
+                    className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white shadow-sm">
+                    <XIcon className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              ))}
+              {/* Reference Images */}
               {refImages.map((ref, idx) => (
                 <div key={idx} className="relative group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -272,14 +339,24 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
 
           {/* ─── Footer ─── */}
           <div className="flex items-center justify-between px-4 pb-4 pt-1">
-            <button
-              onClick={e => { e.stopPropagation(); e.preventDefault(); refInputRef.current?.click() }}
-              disabled={isGenerating || refImages.length >= 10}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition disabled:opacity-30"
-            >
-              <PlusIcon className="h-3.5 w-3.5" />
-              Add another image input
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={e => { e.stopPropagation(); e.preventDefault(); refInputRef.current?.click() }}
+                disabled={isGenerating || refImages.length >= 10}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition disabled:opacity-30"
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                Add Image
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); e.preventDefault(); openCharacterPicker() }}
+                disabled={isGenerating}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-violet-400 hover:text-violet-300 transition disabled:opacity-30"
+              >
+                <UsersIcon className="h-3.5 w-3.5" />
+                Character
+              </button>
+            </div>
 
             <button
               onClick={handleGenerate}
@@ -365,6 +442,83 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
                 <span>{previewIdx! + 1} / {generatedImages.length}</span>
                 <button onClick={() => setPreviewIdx(Math.min(generatedImages.length - 1, previewIdx! + 1))} disabled={previewIdx === generatedImages.length - 1} className="px-2 py-1 rounded hover:bg-card/80 transition disabled:opacity-30">Selanjutnya →</button>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Character Picker Dialog */}
+      {showCharacterPicker && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCharacterPicker(false)}>
+          <div className="relative w-full max-w-lg max-h-[80vh] rounded-2xl border border-violet-500/20 bg-card p-4 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <UsersIcon className="h-4 w-4 text-violet-400" />
+                <h3 className="text-sm font-semibold text-foreground">Pilih Character</h3>
+              </div>
+              <button onClick={() => setShowCharacterPicker(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground">
+                <XIcon className="h-4 w-4" />
+              </button>
+            </div>
+            {characterLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2Icon className="h-6 w-6 text-violet-400 animate-spin" />
+              </div>
+            ) : characterList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <UsersIcon className="h-8 w-8 mb-2 opacity-30" />
+                <p className="text-sm">Belum ada character</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Buat character dulu di halaman Characters</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto max-h-[55vh] pr-1">
+                  {characterList.map((char) => {
+                    const isSelected = selectedCharacters.some(c => c.characterRefId === char.characterRefId)
+                    return (
+                      <button
+                        key={char.id}
+                        onClick={() => toggleCharacter(char)}
+                        className={cn(
+                          "group relative overflow-hidden rounded-xl border-2 transition-all",
+                          isSelected
+                            ? "border-violet-500 bg-violet-500/10 ring-2 ring-violet-500/20"
+                            : "border-border bg-muted/20 hover:border-violet-500/30 hover:bg-violet-500/5"
+                        )}
+                      >
+                        <div className="aspect-square relative bg-muted/30">
+                          {char.imageUrl1 ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={char.imageUrl1} alt={char.displayName} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <UsersIcon className="h-8 w-8 text-muted-foreground/20" />
+                            </div>
+                          )}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500 text-white">
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-2 py-1.5 text-left">
+                          <p className="text-xs font-medium text-foreground truncate">{char.displayName}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
+                  <span className="text-[11px] text-muted-foreground">
+                    {selectedCharacters.length} character dipilih
+                  </span>
+                  <button
+                    onClick={() => setShowCharacterPicker(false)}
+                    className="rounded-lg bg-violet-500 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-violet-600"
+                  >
+                    Selesai
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

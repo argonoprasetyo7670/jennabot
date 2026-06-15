@@ -415,6 +415,8 @@ model users {
   usage_stats                           usage_stats[]
   user_assets                           user_assets[]
   user_credits                          user_credits?
+  user_voices                           user_voices[]
+  user_characters                       user_characters[]
   resellers_users_resellerIdToresellers resellers?            @relation("users_resellerIdToresellers", fields: [resellerId], references: [id])
 
   @@index([createdAt(sort: Desc)])
@@ -444,4 +446,46 @@ model promo_codes {
 
   @@index([code])
   @@index([isActive])
+}
+
+model user_voices {
+  id               String   @id @default(uuid())
+  userId           String
+  voiceRefId       String   @unique
+  displayName      String
+  baseVoice        String
+  dialog           String
+  voicePerformance String
+  audioUrl         String?
+  workflowId       String?
+  mediaId          String?
+  email            String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  users            users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model user_characters {
+  id               String   @id @default(uuid())
+  userId           String
+  characterRefId   String   @unique
+  entityId         String
+  displayName      String
+  personalityNotes String?
+  imageRef1        String
+  imageRef2        String?
+  imageUrl1        String?
+  imageUrl2        String?
+  voiceType        String?
+  voiceValue       String?
+  email            String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  users            users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId])
 }
