@@ -46,7 +46,7 @@ export function useImageGenerateNode(
   activePrompt: string,
   connectedRefIds: string[],         // all pre-uploaded mediaGenerationIds from Upload nodes
   connectedRefEmail: string | null,  // email associated with the first upload
-  mergedCharacters: { characterRefId: string, displayName: string, imageUrl1?: string | null }[] = []
+  mergedCharacters: { characterRefId: string, displayName: string, imageUrl1?: string | null, email?: string }[] = []
 ): UseImageGenerateNodeReturn {
   const { updateNodeData } = useReactFlow()
 
@@ -86,7 +86,7 @@ export function useImageGenerateNode(
         .filter(r => r.uploaded?.mediaGenerationId)
         .map(r => r.uploaded!.mediaGenerationId)
 
-      let email = uploadEmail || connectedRefEmail || undefined
+      let email = uploadEmail || connectedRefEmail || mergedCharacters[0]?.email || undefined
 
       // Merge: connected upload nodes refs + local node refs
       // connectedRefIds are already uploaded to Google Flow — use directly
@@ -173,13 +173,18 @@ export function useImageGenerateNode(
   }
 
   const handleUploadRef = async (files: FileList) => {
+    let currentEmail = uploadEmail
     for (const file of Array.from(files)) {
       if (refImages.length >= 10) break
       const preview = URL.createObjectURL(file)
       setRefImages(prev => [...prev, { file, preview, uploading: true }])
       try {
-        const result = await uploadImageAsset(file, uploadEmail || undefined)
-        if (!uploadEmail) setUploadEmail(result.email)
+        const targetEmail = currentEmail || connectedRefEmail || mergedCharacters[0]?.email || undefined
+        const result = await uploadImageAsset(file, targetEmail)
+        if (!currentEmail) {
+          currentEmail = result.email
+          setUploadEmail(result.email)
+        }
         setRefImages(prev => {
           const updated = prev.map(r => r.preview === preview ? { ...r, uploading: false, uploaded: result } : r)
           updateNodeData(nodeId, {

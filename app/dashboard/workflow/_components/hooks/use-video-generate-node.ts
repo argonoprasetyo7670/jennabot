@@ -37,7 +37,7 @@ export function useVideoGenerateNode(
   connectedEndMediaId: string | null,
   connectedEmail: string | null,
   imageMode: string,
-  mergedCharacters: { characterRefId: string, displayName: string, imageUrl1?: string | null }[] = []
+  mergedCharacters: { characterRefId: string, displayName: string, imageUrl1?: string | null, email?: string }[] = []
 ): UseVideoGenerateNodeReturn {
   const { updateNodeData } = useReactFlow()
 
@@ -78,6 +78,7 @@ export function useVideoGenerateNode(
 
       const email = connectedEmail
         || (nodeData._startImageEmail as string)
+        || mergedCharacters[0]?.email
         || undefined
 
       const isReferenceMode = imageMode === "reference"

@@ -116,6 +116,7 @@ export async function getCharactersAndVoices() {
         imageUrl2: true,
         voiceType: true,
         voiceValue: true,
+        email: true,
         createdAt: true,
       },
     }),
@@ -152,6 +153,7 @@ export async function createCharacterAction(params: {
   imageType_1?: string  // mime type
   imageData_2?: string
   imageType_2?: string
+  email?: string
 }) {
   const userId = await requireAuth()
   const apiToken = requireToken()
@@ -242,7 +244,7 @@ export async function createCharacterAction(params: {
       imageUrl2,
       voiceType,
       voiceValue,
-      email: emailFromRef,
+      email: params.email || emailFromRef,
     },
   })
 
@@ -301,6 +303,7 @@ export async function createVoiceAction(params: {
   displayName: string
   dialog: string
   voicePerformance: string
+  email?: string
 }) {
   const userId = await requireAuth()
   const apiToken = requireToken()
@@ -319,7 +322,7 @@ export async function createVoiceAction(params: {
   }
 
   // Resolve email (required by POST /voices)
-  const email = await resolveEmail(apiToken)
+  const email = params.email || await resolveEmail(apiToken)
 
   const basePayload = {
     email,

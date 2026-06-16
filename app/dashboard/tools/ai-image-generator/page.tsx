@@ -54,6 +54,7 @@ interface CharacterItem {
   displayName: string
   imageUrl1?: string | null
   imageUrl2?: string | null
+  email?: string
 }
 
 export default function AIImageGeneratorPage() {
@@ -224,6 +225,7 @@ export default function AIImageGeneratorPage() {
         aspectRatio: ASPECT_RATIOS[selectedRatio],
         count: IMAGE_COUNTS[selectedCount],
         characters: charRefs.length > 0 ? charRefs : undefined,
+        email: selectedCharacters.length > 0 ? selectedCharacters[0].email : undefined,
       },
       refs.length > 0 ? refs : undefined
     )

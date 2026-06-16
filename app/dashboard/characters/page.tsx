@@ -41,10 +41,10 @@ interface CharacterItem {
   personalityNotes: string | null
   imageRef1: string
   imageRef2: string | null
-  imageUrl1: string | null
   imageUrl2: string | null
   voiceType: string | null
   voiceValue: string | null
+  email: string
 }
 
 interface VoiceItem {
@@ -85,6 +85,12 @@ export default function CharactersPage() {
   // ── UI state ──
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+  }>({ isOpen: false, title: "", description: "", onConfirm: () => { } })
   const [playingVoice, setPlayingVoice] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [voiceSearch, setVoiceSearch] = useState("")
@@ -170,11 +176,13 @@ export default function CharactersPage() {
       }
 
       // Upload images to UseAPI for reference IDs
+      let firstEmail = characters.length > 0 ? characters[0].email : undefined
       const uploadedIds: string[] = []
       for (const img of charImages) {
         setCharStatus("Mengupload gambar...")
-        const result = await uploadImageAsset(img.file)
+        const result = await uploadImageAsset(img.file, firstEmail)
         uploadedIds.push(result.mediaGenerationId)
+        if (!firstEmail && result.email) firstEmail = result.email
       }
 
       setCharStatus("Membuat character...")
@@ -190,6 +198,7 @@ export default function CharactersPage() {
         imageType_1: imageDataList[0]?.type,
         imageData_2: imageDataList[1]?.base64,
         imageType_2: imageDataList[1]?.type,
+        email: firstEmail,
       })
 
       charImages.forEach(img => URL.revokeObjectURL(img.preview))
@@ -214,11 +223,13 @@ export default function CharactersPage() {
     if (!voicePreset || !voiceName.trim() || !voiceDialog.trim() || !voicePerformance.trim()) return
     setVoiceCreating(true)
     try {
+      const targetEmail = characters.length > 0 ? characters[0].email : undefined
       await createVoiceAction({
         voice: voicePreset,
         displayName: voiceName.trim(),
         dialog: voiceDialog.trim(),
         voicePerformance: voicePerformance.trim(),
+        email: targetEmail,
       })
       setVoicePreset(""); setVoiceName(""); setVoiceDialog(""); setVoicePerformance("")
       setShowCreateVoice(false)
@@ -232,8 +243,16 @@ export default function CharactersPage() {
   }
 
   // ── Delete (server actions) ──
+  const requestDeleteCharacter = (refId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Hapus Character",
+      description: "Apakah Anda yakin ingin menghapus character ini? Karakter akan dihapus dari database",
+      onConfirm: () => handleDeleteCharacter(refId),
+    })
+  }
+
   const handleDeleteCharacter = async (refId: string) => {
-    if (!confirm("Hapus character ini?")) return
     setDeletingId(refId)
     try {
       await deleteCharacterAction(refId)
@@ -241,11 +260,22 @@ export default function CharactersPage() {
       setToast({ msg: "Character berhasil dihapus", type: "success" })
     } catch (err) {
       setToast({ msg: err instanceof Error ? err.message : "Gagal menghapus", type: "error" })
-    } finally { setDeletingId(null) }
+    } finally {
+      setDeletingId(null)
+      setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+    }
+  }
+
+  const requestDeleteVoice = (refId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Hapus Custom Voice",
+      description: "Apakah Anda yakin ingin menghapus custom voice ini? Voice akan dihapus secara permanen.",
+      onConfirm: () => handleDeleteVoice(refId),
+    })
   }
 
   const handleDeleteVoice = async (refId: string) => {
-    if (!confirm("Hapus custom voice ini?")) return
     setDeletingId(refId)
     try {
       await deleteVoiceAction(refId)
@@ -253,7 +283,10 @@ export default function CharactersPage() {
       setToast({ msg: "Voice berhasil dihapus", type: "success" })
     } catch (err) {
       setToast({ msg: err instanceof Error ? err.message : "Gagal menghapus", type: "error" })
-    } finally { setDeletingId(null) }
+    } finally {
+      setDeletingId(null)
+      setConfirmDialog(prev => ({ ...prev, isOpen: false }))
+    }
   }
 
   // ── Filtered voices ──
@@ -333,7 +366,7 @@ export default function CharactersPage() {
                     character={char}
                     index={i}
                     deleting={deletingId === char.characterRefId}
-                    onDelete={() => handleDeleteCharacter(char.characterRefId)}
+                    onDelete={() => requestDeleteCharacter(char.characterRefId)}
                   />
                 ))}
               </div>
@@ -367,7 +400,7 @@ export default function CharactersPage() {
                         playing={playingVoice === v.id}
                         deleting={deletingId === v.voiceRefId}
                         onPlay={() => v.audioUrl ? playVoice(v.audioUrl, v.id) : null}
-                        onDelete={() => handleDeleteVoice(v.voiceRefId)}
+                        onDelete={() => requestDeleteVoice(v.voiceRefId)}
                       />
                     ))}
                   </div>
@@ -684,6 +717,27 @@ export default function CharactersPage() {
           </div>
         </div>
       )}
+
+      {/* ═══ Confirm Dialog ═══ */}
+      <Dialog open={confirmDialog.isOpen} onOpenChange={(open) => { if (!deletingId) setConfirmDialog(prev => ({ ...prev, isOpen: open })) }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-400">{confirmDialog.title}</DialogTitle>
+            <DialogDescription className="pt-2">
+              {confirmDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))} disabled={deletingId !== null} size="sm">
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={confirmDialog.onConfirm} disabled={deletingId !== null} size="sm" className="gap-2">
+              {deletingId !== null ? <Loader2Icon className="h-3.5 w-3.5 animate-spin" /> : <XIcon className="h-3.5 w-3.5" />}
+              {deletingId !== null ? "Menghapus..." : "Hapus Permanen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

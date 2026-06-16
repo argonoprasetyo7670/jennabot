@@ -56,6 +56,7 @@ interface CharacterItem {
   displayName: string
   imageUrl1?: string | null
   imageUrl2?: string | null
+  email?: string
 }
 
 function isMediaExpired(url?: string, proxyUrl?: string): boolean {
@@ -234,6 +235,14 @@ export default function AIVideoGeneratorPage() {
     }
   }
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`
+    }
+  }, [prompt])
+
   const handleGenerate = () => {
     if (!prompt.trim() || isGenerating) return
     setShowSettings(false)
@@ -253,6 +262,7 @@ export default function AIVideoGeneratorPage() {
         duration: DURATIONS[selectedDuration],
         count: VIDEO_COUNTS[selectedCount],
         characters: charRefs.length > 0 ? charRefs : undefined,
+        email: selectedCharacters.length > 0 ? selectedCharacters[0].email : undefined,
       },
       imageMode === "reference" && refs.length > 0 ? refs : undefined,
       imageMode === "start" ? {
@@ -623,7 +633,7 @@ export default function AIVideoGeneratorPage() {
               placeholder="Deskripsikan video yang ingin Anda buat..."
               rows={1}
               className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-              style={{ lineHeight: "1.5" }}
+              style={{ lineHeight: "1.5", overflowY: "auto" }}
             />
 
             <div className="mb-1 flex shrink-0 items-center gap-1.5">

@@ -9,9 +9,13 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL!,
-    connectionTimeoutMillis: 10000, 
-    // Di Vercel Serverless, 1 instance = 1 request concurrently. Set max ke 1 atau 2 agar tidak menghabiskan limit DB.
-    max: process.env.NODE_ENV === "development" ? 2 : 1, 
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 10000,       // Release idle connections after 10s (default is 10000 but being explicit)
+    max: process.env.NODE_ENV === "development" ? 3 : 2,
+  });
+  // Prevent unhandled pool errors from crashing the process
+  pool.on("error", (err) => {
+    console.error("[pg-pool] Idle client error:", err.message);
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });

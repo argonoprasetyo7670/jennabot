@@ -182,7 +182,7 @@ function submitJobToStore(
     ; (async () => {
       try {
         const refs: string[] = []
-        let email: string | undefined
+        let email: string | undefined = params.email
 
         if (references?.length) {
           for (let i = 0; i < references.length; i++) {
@@ -324,7 +324,7 @@ function submitVideoJobToStore(
 
     ; (async () => {
       try {
-        let email: string | undefined
+        let email: string | undefined = params.email
         const videoParams: GenerateVideoParams = { ...params }
 
         // Upload start frame

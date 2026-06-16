@@ -114,6 +114,7 @@ export async function generateImages(params: GenerateImageParams): Promise<Gener
     count: params.count || 1,
     seed: params.seed,
     references: params.references,
+    characters: params.characters,
     async: true,
   }
 
@@ -368,6 +369,9 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
 
   if (params.referenceImages?.length) {
     body.referenceImages = params.referenceImages
+  }
+  if (params.characters?.length) {
+    body.characters = params.characters
   }
 
   // Step 1: Start generation (returns immediately with jobId)
