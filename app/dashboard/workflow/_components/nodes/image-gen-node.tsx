@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NodeShell, getPortColor } from "../node-shell"
-import { useConnectedPrompt, useAllConnectedValues } from "../use-connected-value"
+import { useConnectedPrompt, useAllConnectedValues, useConnectedValue } from "../use-connected-value"
 import { useImageGenerateNode } from "../hooks/use-image-generate-node"
 import { IMAGE_MODELS, IMAGE_ASPECT_RATIOS, DEFAULTS } from "../node-defaults"
 import { getCharactersAndVoices } from "@/app/dashboard/characters/actions"
@@ -116,7 +116,10 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
     .filter(Boolean)
   const connectedRefEmail = (allRefEmails.find(r => r.value)?.value as string) || null
 
+  const connectedCharacters = (useConnectedValue("prompt", "_selectedCharacters") as CharacterItem[]) || []
   const activePrompt = connectedPrompt || (nodeData._localPrompt as string) || ""
+
+  const mergedCharacters = [...selectedCharacters, ...connectedCharacters].filter((c, idx, self) => self.findIndex(s => s.characterRefId === c.characterRefId) === idx)
 
   const {
     isGenerating, error, localPrompt, refImages, previewIdx, savingGallery,
@@ -124,7 +127,7 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
     setLocalPrompt, setPreviewIdx,
     handleGenerate, handleSelect, handleDownload, handleSaveToGallery,
     handleUploadRef, handleRemoveRef,
-  } = useImageGenerateNode(nodeId, nodeData, activePrompt, connectedRefIds, connectedRefEmail)
+  } = useImageGenerateNode(nodeId, nodeData, activePrompt, connectedRefIds, connectedRefEmail, mergedCharacters)
 
   const previewImage = previewIdx !== null ? generatedImages[previewIdx] : null
 
@@ -297,26 +300,31 @@ export function ImageGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
           </div>
 
           {/* ─── Uploaded Reference & Character Thumbnails ─── */}
-          {(refImages.length > 0 || selectedCharacters.length > 0) && (
+          {(refImages.length > 0 || mergedCharacters.length > 0) && (
             <div className="px-4 pb-2 flex items-center gap-1.5 flex-wrap">
               {/* Selected Characters */}
-              {selectedCharacters.map((char) => (
-                <div key={char.characterRefId} className="relative group flex h-10 items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-2">
-                  {char.imageUrl1 ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={char.imageUrl1} alt={char.displayName} className="h-6 w-6 rounded object-cover" />
-                  ) : (
-                    <div className="flex h-6 w-6 items-center justify-center rounded bg-violet-500/20">
-                      <UsersIcon className="h-3 w-3 text-violet-400" />
-                    </div>
-                  )}
-                  <span className="text-[10px] font-medium text-violet-300 max-w-[50px] truncate">{char.displayName}</span>
-                  <button onClick={(e) => { e.stopPropagation(); removeCharacter(char.characterRefId) }}
-                    className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white shadow-sm">
-                    <XIcon className="h-2.5 w-2.5" />
-                  </button>
-                </div>
-              ))}
+              {mergedCharacters.map((char) => {
+                const isFromPrompt = connectedCharacters.some(c => c.characterRefId === char.characterRefId)
+                return (
+                  <div key={char.characterRefId} className="relative group flex h-10 items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-2" title={isFromPrompt ? "Karakter dari Prompt Node" : "Karakter dari Image Node"}>
+                    {char.imageUrl1 ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={char.imageUrl1} alt={char.displayName} className="h-6 w-6 rounded object-cover" />
+                    ) : (
+                      <div className="flex h-6 w-6 items-center justify-center rounded bg-violet-500/20">
+                        <UsersIcon className="h-3 w-3 text-violet-400" />
+                      </div>
+                    )}
+                    <span className="text-[10px] font-medium text-violet-300 max-w-[50px] truncate">{char.displayName}</span>
+                    {!isFromPrompt && (
+                      <button onClick={(e) => { e.stopPropagation(); removeCharacter(char.characterRefId) }}
+                        className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white shadow-sm">
+                        <XIcon className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
               {/* Reference Images */}
               {refImages.map((ref, idx) => (
                 <div key={idx} className="relative group">

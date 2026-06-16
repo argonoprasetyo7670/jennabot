@@ -2,20 +2,37 @@
 
 import { Handle, Position, useReactFlow } from "@xyflow/react"
 import type { NodeProps } from "@xyflow/react"
-import { MoreHorizontalIcon, CopyIcon, TrashIcon, PencilIcon } from "lucide-react"
+import { MoreHorizontalIcon, CopyIcon, TrashIcon, PencilIcon, UsersIcon, Loader2Icon } from "lucide-react"
 import { useState, useRef, useEffect, useCallback } from "react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { getPortColor } from "../node-shell"
+import { getCharactersAndVoices } from "@/app/dashboard/characters/actions"
+
+interface CharacterItem {
+  id: string
+  characterRefId: string
+  displayName: string
+  imageUrl1?: string | null
+  imageUrl2?: string | null
+}
 
 export function PromptNodeComponent({ data, id: nodeId, selected }: NodeProps) {
   const { updateNodeData, deleteElements, getNodes, setNodes } = useReactFlow()
   const nodeData = data as Record<string, unknown>
   const promptText = (nodeData.prompt as string) || ""
   const title = (nodeData.title as string) ?? "Prompt"
+  const selectedCharacters = (nodeData._selectedCharacters as CharacterItem[]) || []
 
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const [mentionSearch, setMentionSearch] = useState<string | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const [characterList, setCharacterList] = useState<CharacterItem[]>([])
+  const [characterLoading, setCharacterLoading] = useState(false)
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -28,6 +45,82 @@ export function PromptNodeComponent({ data, id: nodeId, selected }: NodeProps) {
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
   }, [menuOpen])
+
+  const filteredCharacters = mentionSearch !== null
+    ? characterList.filter(c => c.displayName.toLowerCase().includes(mentionSearch))
+    : []
+
+  const selectMention = (char: CharacterItem) => {
+    if (!textareaRef.current) return
+    const cursor = textareaRef.current.selectionStart
+    const textBeforeCursor = promptText.slice(0, cursor)
+    const textAfterCursor = promptText.slice(cursor)
+
+    const match = textBeforeCursor.match(/(?:\s|^)@([^ ]*)$/)
+    if (match) {
+      const mentionStart = cursor - match[0].length + (match[0].startsWith(" ") ? 1 : 0)
+      const newPrompt = promptText.slice(0, mentionStart) + `[${char.displayName}] ` + textAfterCursor
+      
+      let newChars = selectedCharacters
+      if (!selectedCharacters.some(c => c.characterRefId === char.characterRefId)) {
+        newChars = [...selectedCharacters, char]
+      }
+      
+      updateNodeData(nodeId, { prompt: newPrompt, _selectedCharacters: newChars })
+    }
+    
+    setMentionSearch(null)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 0)
+  }
+
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    updateNodeData(nodeId, { prompt: val })
+
+    const cursor = e.target.selectionStart
+    const textBeforeCursor = val.slice(0, cursor)
+    const match = textBeforeCursor.match(/(?:\s|^)@([^ ]*)$/)
+    
+    if (match) {
+      setMentionSearch(match[1].toLowerCase())
+      setMentionIndex(0)
+      if (characterList.length === 0 && !characterLoading) {
+        setCharacterLoading(true)
+        getCharactersAndVoices().then(res => {
+          setCharacterList(res.characters as CharacterItem[])
+          setCharacterLoading(false)
+        }).catch(() => setCharacterLoading(false))
+      }
+    } else {
+      setMentionSearch(null)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionSearch !== null && filteredCharacters.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setMentionIndex(i => (i + 1) % filteredCharacters.length)
+        return
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setMentionIndex(i => (i - 1 + filteredCharacters.length) % filteredCharacters.length)
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault()
+        selectMention(filteredCharacters[mentionIndex])
+        return
+      }
+      if (e.key === "Escape") {
+        setMentionSearch(null)
+        return
+      }
+    }
+  }
 
   const handleDuplicate = useCallback(() => {
     setMenuOpen(false)
@@ -143,10 +236,43 @@ export function PromptNodeComponent({ data, id: nodeId, selected }: NodeProps) {
       </div>
 
       {/* ─── Main Content (Darker inner box) ─── */}
-      <div className="mx-2 mb-2 rounded-xl bg-muted/40 p-4 border border-border/50">
+      <div className="mx-2 mb-2 rounded-xl bg-muted/40 p-4 border border-border/50 relative">
+        {mentionSearch !== null && (filteredCharacters.length > 0 || characterLoading) && (
+          <div className="absolute top-full left-4 mt-2 w-64 max-h-48 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl backdrop-blur-xl z-50">
+            {characterLoading && filteredCharacters.length === 0 ? (
+              <div className="flex items-center justify-center py-4 text-muted-foreground">
+                <Loader2Icon className="h-4 w-4 animate-spin" />
+              </div>
+            ) : (
+              filteredCharacters.map((char, i) => (
+                <button
+                  key={char.characterRefId}
+                  onClick={() => selectMention(char)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-all",
+                    mentionIndex === i ? "bg-violet-500/10 text-violet-400" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  {char.imageUrl1 ? (
+                    <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md">
+                      <Image src={char.imageUrl1} alt={char.displayName} fill className="object-cover" unoptimized />
+                    </div>
+                  ) : (
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-500/20">
+                      <UsersIcon className="h-3 w-3 text-violet-400" />
+                    </div>
+                  )}
+                  <span className="truncate font-medium">{char.displayName}</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
         <textarea
+          ref={textareaRef}
           value={promptText}
-          onChange={e => updateNodeData(nodeId, { prompt: e.target.value })}
+          onChange={handlePromptChange}
+          onKeyDown={handleKeyDown}
           placeholder='Try "A beautiful female animated character with a happy vibe."'
           className="w-full min-h-[140px] bg-transparent text-[13px] leading-relaxed text-foreground/90 placeholder:text-muted-foreground/50 focus:outline-none resize-none"
         />

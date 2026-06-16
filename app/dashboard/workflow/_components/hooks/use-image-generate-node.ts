@@ -46,6 +46,7 @@ export function useImageGenerateNode(
   activePrompt: string,
   connectedRefIds: string[],         // all pre-uploaded mediaGenerationIds from Upload nodes
   connectedRefEmail: string | null,  // email associated with the first upload
+  mergedCharacters: { characterRefId: string, displayName: string, imageUrl1?: string | null }[] = []
 ): UseImageGenerateNodeReturn {
   const { updateNodeData } = useReactFlow()
 
@@ -96,8 +97,7 @@ export function useImageGenerateNode(
       const count = (nodeData.count as number) || DEFAULTS.imageCount
       const aspectRatio = ((nodeData.aspectRatio as string) || DEFAULTS.imageAspectRatio) as "9:16"
 
-      const selectedCharacters = (nodeData._selectedCharacters as { characterRefId: string, displayName: string, imageUrl1?: string }[]) || []
-      const characters = selectedCharacters.map(c => c.characterRefId)
+      const characters = mergedCharacters.map(c => c.characterRefId)
 
       const result = await generateImages({
         prompt: activePrompt.trim(),

@@ -16,9 +16,10 @@ Generate videos using Google Flow AI models from text prompts with optional star
 | `veo-3.1-fast` *(default)* | 4s/6s/8s + Extend | Non-Ultra: 20, Ultra: 10 |
 | `veo-3.1-quality` | 8s only + Extend | 100 |
 | `omni-flash` | 4s/6s/8s/10s (T2V, R2V, V2V edit) | 4s:15 / 6s:20 / 8s:25 / 10s:30; V2V edit: 40 |
+| `veo_3_1_upsampler` | Upscale to 1080p / 4K | 1080p: **0**, 4K: **50** |
 
 > [!IMPORTANT]
-> `CREDIT_COST_VIDEO = 5` in our app is a **simplification** — the actual UseAPI credit cost varies per model. Our internal credits are separate from UseAPI credits. Adjust pricing per-model if needed.
+> `CREDIT_COST_VIDEO = 5` in our app is a **simplification** — the actual UseAPI credit cost varies per model. Our internal credits are separate from UseAPI credits. Adjust pricing per-model if needed. Video Upscale costs: `0` internal credits for 1080p, `50` internal credits for 4K.
 
 ### Aspect Ratios
 
@@ -153,6 +154,30 @@ Client polls GET /api/ai/video-generate?jobId=...
 
 ---
 
+## Upscale to 1080p / 4K
+
+> **Endpoint:** `POST https://api.useapi.net/v1/google-flow/videos/upscale`
+> **Internal proxy:** `POST /api/ai/video-upscale`
+
+Upscale a previously generated Google Flow video. 
+- **1080p**: Free (0 credits)
+- **4K**: 50 credits (Requires Google AI Ultra on UseAPI side, we charge 50 internal credits)
+- **Speed**: 1080p takes 30-60s. 4K takes a few minutes.
+- **Cache**: Upscaling the same video twice returns a cached result.
+
+### Request Body
+```json
+{
+  "mediaGenerationId": "user:12345-email:6a6f...-video:CAMaJDMx...",
+  "resolution": "1080p" // or "4K"
+}
+```
+
+### Response (200 OK)
+Returns the same payload shape as the job polling response, where `media[].videoUrl` and `media[].thumbnailUrl` are the upscaled assets.
+
+---
+
 ## Error Handling
 
 | Status | Cause | Action |
@@ -208,6 +233,7 @@ Preview: `https://www.gstatic.com/aitestkitchen/voices/samples/{Name}.wav`
 | `async: true` + polling | ✅ |
 | `replyUrl` webhook callback | ✅ (production only) |
 | `thumbnailUrl` extraction | ✅ |
+| Video Upscaling (1080p / 4K) | ✅ |
 | `omni-flash` model in UI | ❌ not yet |
 | Veo aspect ratios 1:1, 4:3, 3:4 in UI | ❌ not yet |
 | omni-flash R2V refs 4-7 | ❌ not yet |

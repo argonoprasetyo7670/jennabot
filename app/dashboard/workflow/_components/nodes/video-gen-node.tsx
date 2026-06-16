@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NodeShell, NodeCloseBtn, HandleIcon, getPortColor } from "../node-shell"
-import { useConnectedPrompt, useConnectedValue } from "../use-connected-value"
+import { useConnectedPrompt, useConnectedValue, useAllConnectedValues } from "../use-connected-value"
 import { useVideoGenerateNode } from "../hooks/use-video-generate-node"
 import { VIDEO_MODELS, VIDEO_ASPECT_RATIOS, DEFAULTS } from "../node-defaults"
 import { getCharactersAndVoices } from "@/app/dashboard/characters/actions"
@@ -112,12 +112,15 @@ export function VideoGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
     updateNodeData(nodeId, { _selectedCharacters: updated, imageMode: updated.length > 0 ? "reference" : nd.imageMode })
   }
 
+  const connectedCharacters = (useConnectedValue("prompt", "_selectedCharacters") as CharacterItem[]) || []
+  const mergedCharacters = [...selectedCharacters, ...connectedCharacters].filter((c, idx, self) => self.findIndex(s => s.characterRefId === c.characterRefId) === idx)
+
   const {
-    isGenerating, error, localPrompt, elapsed, previewOpen, savingGallery,
+    isGenerating, isUpscaling, error, localPrompt, elapsed, previewOpen, savingGallery,
     generatedVideoUrl, rawVideoUrl,
     setLocalPrompt, setPreviewOpen,
-    handleGenerate, handleDownload, handleSaveGallery, fmtTime,
-  } = useVideoGenerateNode(nodeId, nd, activePrompt, connectedImage, connectedMediaId, connectedEndMediaId, connectedEmail, imageMode)
+    handleGenerate, handleUpscale, handleDownload, handleSaveGallery, fmtTime,
+  } = useVideoGenerateNode(nodeId, nd, activePrompt, connectedImage, connectedMediaId, connectedEndMediaId, connectedEmail, imageMode, mergedCharacters)
 
   const headerActions = (
     <div className="relative" ref={menuRef}>
@@ -244,14 +247,38 @@ export function VideoGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
           {generatedVideoUrl && !isGenerating ? (
             <>
               <video src={generatedVideoUrl} className="w-full h-full object-cover" muted />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity">
                 <PlayIcon className="h-8 w-8 text-white drop-shadow" />
               </div>
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={e => { e.stopPropagation(); setPreviewOpen(true) }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70"
+                >
+                  <ExpandIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="absolute bottom-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={e => { e.stopPropagation(); handleUpscale("1080p") }}
+                  disabled={isUpscaling}
+                  className="px-2 py-1 text-[9px] font-medium rounded-md bg-black/60 text-white hover:bg-violet-600 transition-colors backdrop-blur-sm"
+                >
+                  Upscale 1080p (Free)
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); handleUpscale("4K") }}
+                  disabled={isUpscaling}
+                  className="px-2 py-1 text-[9px] font-medium rounded-md bg-black/60 text-amber-400 hover:bg-amber-600 hover:text-white transition-colors backdrop-blur-sm"
+                >
+                  Upscale 4K (50 Credits)
+                </button>
+              </div>
             </>
-          ) : isGenerating ? (
+          ) : isGenerating || isUpscaling ? (
             <div className="flex flex-col items-center justify-center h-full gap-2">
               <Loader2Icon className="h-6 w-6 text-cyan-400 animate-spin" />
-              <p className="text-[10px] text-muted-foreground">Generating {fmtTime(elapsed)}</p>
+              <p className="text-[10px] text-muted-foreground">{isUpscaling ? "Upscaling..." : "Generating"} {fmtTime(elapsed)}</p>
               <div className="w-2/3 h-1 rounded-full bg-muted overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full animate-pulse"
                   style={{ width: `${Math.min(95, elapsed * 0.8)}%`, transition: "width 1s" }} />
@@ -265,7 +292,7 @@ export function VideoGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
         </div>
 
         {/* Selected Image/Characters Area */}
-        {(connectedImage || selectedCharacters.length > 0) && (
+        {(connectedImage || mergedCharacters.length > 0) && (
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             {connectedImage && (
               <div className="flex items-center gap-2 rounded-lg bg-blue-500/5 border border-blue-500/20 px-2 py-1">
@@ -276,23 +303,28 @@ export function VideoGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
             )}
             
             {/* Selected Characters */}
-            {selectedCharacters.map((char) => (
-              <div key={char.characterRefId} className="group flex h-8 items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-2 relative">
-                {char.imageUrl1 ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={char.imageUrl1} alt={char.displayName} className="h-5 w-5 rounded object-cover" />
-                ) : (
-                  <div className="flex h-5 w-5 items-center justify-center rounded bg-violet-500/20">
-                    <UsersIcon className="h-3 w-3 text-violet-400" />
-                  </div>
-                )}
-                <span className="text-[10px] font-medium text-violet-300 max-w-[50px] truncate">{char.displayName}</span>
-                <button onClick={(e) => { e.stopPropagation(); removeCharacter(char.characterRefId) }}
-                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white shadow-sm z-20">
-                  <XIcon className="h-2.5 w-2.5" />
-                </button>
-              </div>
-            ))}
+            {mergedCharacters.map((char) => {
+              const isFromPrompt = connectedCharacters.some(c => c.characterRefId === char.characterRefId)
+              return (
+                <div key={char.characterRefId} className="group flex h-8 items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/5 px-2 relative" title={isFromPrompt ? "Karakter dari Prompt Node" : "Karakter dari Video Node"}>
+                  {char.imageUrl1 ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={char.imageUrl1} alt={char.displayName} className="h-5 w-5 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-5 w-5 items-center justify-center rounded bg-violet-500/20">
+                      <UsersIcon className="h-3 w-3 text-violet-400" />
+                    </div>
+                  )}
+                  <span className="text-[10px] font-medium text-violet-300 max-w-[50px] truncate">{char.displayName}</span>
+                  {!isFromPrompt && (
+                    <button onClick={(e) => { e.stopPropagation(); removeCharacter(char.characterRefId) }}
+                      className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-white shadow-sm z-20">
+                      <XIcon className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import { useReactFlow } from "@xyflow/react"
-import { generateVideos } from "@/lib/api/google-flow"
+import { generateVideos, upscaleGoogleVideo } from "@/lib/api/google-flow"
 import { downloadVideo } from "@/lib/download"
 import { saveToGallery } from "../actions/gallery"
 import { DEFAULTS, toVideoAspect, toDurationSeconds, type VideoModel } from "../node-defaults"
@@ -10,17 +10,19 @@ import { DEFAULTS, toVideoAspect, toDurationSeconds, type VideoModel } from "../
 export interface UseVideoGenerateNodeReturn {
   // State
   isGenerating: boolean
+  isUpscaling: boolean
   error: string | null
   localPrompt: string
   elapsed: number
   previewOpen: boolean
   savingGallery: boolean
-  generatedVideoUrl: string | undefined
-  rawVideoUrl: string | undefined
+  generatedVideoUrl: string | null
+  rawVideoUrl: string | null
   // Actions
   setLocalPrompt: (v: string) => void
   setPreviewOpen: (v: boolean) => void
   handleGenerate: () => Promise<void>
+  handleUpscale: (resolution: "1080p" | "4K") => Promise<void>
   handleDownload: () => Promise<void>
   handleSaveGallery: () => Promise<void>
   fmtTime: (s: number) => string
@@ -33,12 +35,14 @@ export function useVideoGenerateNode(
   connectedImage: string | null,
   connectedMediaId: string | null,
   connectedEndMediaId: string | null,
-  connectedEmail: string | null = null,
-  imageMode: string = "start",
+  connectedEmail: string | null,
+  imageMode: string,
+  mergedCharacters: { characterRefId: string, displayName: string, imageUrl1?: string | null }[] = []
 ): UseVideoGenerateNodeReturn {
   const { updateNodeData } = useReactFlow()
 
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isUpscaling, setIsUpscaling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [localPrompt, setLocalPromptState] = useState((nodeData._localPrompt as string) || "")
   const [elapsed, setElapsed] = useState(0)
@@ -46,8 +50,8 @@ export function useVideoGenerateNode(
   const [savingGallery, setSavingGallery] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const generatedVideoUrl = nodeData._videoUrl as string | undefined
-  const rawVideoUrl = nodeData._rawVideoUrl as string | undefined
+  const generatedVideoUrl = (nodeData._videoUrl || nodeData.upscaledVideoUrl) as string | null
+  const rawVideoUrl = (nodeData._rawVideoUrl || nodeData.upscaledVideoUrl) as string | null
 
   const setLocalPrompt = (v: string) => {
     setLocalPromptState(v)
@@ -57,15 +61,14 @@ export function useVideoGenerateNode(
   const handleGenerate = async () => {
     if (!activePrompt?.trim()) { setError("Prompt kosong."); return }
     setIsGenerating(true); setError(null); setElapsed(0)
-    updateNodeData(nodeId, { status: "running", _videoUrl: undefined, _rawVideoUrl: undefined })
+    updateNodeData(nodeId, { status: "running", _videoUrl: undefined, _rawVideoUrl: undefined, upscaledVideoUrl: undefined })
     timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
 
     try {
       const model = ((nodeData.model as string) || DEFAULTS.videoModel) as VideoModel
       const aspectRatio = (nodeData.aspectRatio as string) || DEFAULTS.videoAspectRatio
-      const duration = (nodeData.duration as string) || DEFAULTS.videoDuration
+      const duration = ((nodeData.duration as string) || DEFAULTS.videoDuration) as any
 
-      // startImage MUST be a mediaGenerationId, not a URL
       const startImageId = connectedMediaId
         || (nodeData._startImageMediaId as string)
         || undefined
@@ -77,12 +80,8 @@ export function useVideoGenerateNode(
         || (nodeData._startImageEmail as string)
         || undefined
 
-      // Assets/reference mode → referenceImages (supports 8s)
-      // Frame/start mode → startImage (I2V, may cap at 4s on lite)
       const isReferenceMode = imageMode === "reference"
-
-      const selectedCharacters = (nodeData._selectedCharacters as { characterRefId: string, displayName: string, imageUrl1?: string }[]) || []
-      const characters = selectedCharacters.map(c => c.characterRefId)
+      const characters = mergedCharacters.map(c => c.characterRefId)
 
       const result = await generateVideos({
         prompt: activePrompt.trim(),
@@ -96,7 +95,6 @@ export function useVideoGenerateNode(
         ...(email ? { email } : {}),
       })
 
-      // Auto-save to gallery and use CDN URLs
       const processedVideos = await Promise.all(
         result.videos.map(async (vid) => {
           if (!vid || (!vid.rawUrl && !vid.url)) return vid
@@ -134,8 +132,32 @@ export function useVideoGenerateNode(
     }
   }
 
+  const handleUpscale = async (resolution: "1080p" | "4K") => {
+    const mediaId = (nodeData.mediaGenerationId || nodeData._videoMediaId) as string | undefined
+    if (!mediaId) {
+      setError("Tidak ada video untuk diupscale")
+      return
+    }
+
+    setIsUpscaling(true)
+    setError(null)
+    setElapsed(0)
+    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000)
+
+    try {
+      const result = await upscaleGoogleVideo(mediaId, resolution)
+      updateNodeData(nodeId, { upscaledVideoUrl: result.videoUrl })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Gagal upscale video"
+      setError(msg)
+    } finally {
+      if (timerRef.current) clearInterval(timerRef.current)
+      setIsUpscaling(false)
+    }
+  }
+
   const handleDownload = async () => {
-    const url = rawVideoUrl || generatedVideoUrl
+    const url = rawVideoUrl
     if (!url) return
     try { await downloadVideo(url, "workflow-video.mp4") } catch { }
   }
@@ -157,9 +179,9 @@ export function useVideoGenerateNode(
   const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`
 
   return {
-    isGenerating, error, localPrompt, elapsed, previewOpen, savingGallery,
+    isGenerating, isUpscaling, error, localPrompt, elapsed, previewOpen, savingGallery,
     generatedVideoUrl, rawVideoUrl,
     setLocalPrompt, setPreviewOpen,
-    handleGenerate, handleDownload, handleSaveGallery, fmtTime,
+    handleGenerate, handleUpscale, handleDownload, handleSaveGallery, fmtTime,
   }
 }

@@ -74,6 +74,10 @@ export default function AIImageGeneratorPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const plusMenuRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const [mentionSearch, setMentionSearch] = useState<string | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
 
   // Character picker state
   const [showCharacterPicker, setShowCharacterPicker] = useState(false)
@@ -150,6 +154,56 @@ export default function AIImageGeneratorPage() {
     setSelectedCharacters(prev => prev.filter(c => c.characterRefId !== refId))
   }
 
+  const filteredCharacters = mentionSearch !== null
+    ? characterList.filter(c => c.displayName.toLowerCase().includes(mentionSearch))
+    : []
+
+  const selectMention = (char: CharacterItem) => {
+    if (!textareaRef.current) return
+    const cursor = textareaRef.current.selectionStart
+    const textBeforeCursor = prompt.slice(0, cursor)
+    const textAfterCursor = prompt.slice(cursor)
+
+    const match = textBeforeCursor.match(/(?:\s|^)@([^ ]*)$/)
+    if (match) {
+      const mentionStart = cursor - match[0].length + (match[0].startsWith(" ") ? 1 : 0)
+      const newPrompt = prompt.slice(0, mentionStart) + `[${char.displayName}] ` + textAfterCursor
+      setPrompt(newPrompt)
+      
+      if (!selectedCharacters.some(c => c.characterRefId === char.characterRefId)) {
+        setSelectedCharacters(prev => [...prev, char])
+      }
+    }
+    
+    setMentionSearch(null)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 0)
+  }
+
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    setPrompt(val)
+
+    const cursor = e.target.selectionStart
+    const textBeforeCursor = val.slice(0, cursor)
+    const match = textBeforeCursor.match(/(?:\s|^)@([^ ]*)$/)
+    
+    if (match) {
+      setMentionSearch(match[1].toLowerCase())
+      setMentionIndex(0)
+      if (characterList.length === 0 && !characterLoading) {
+        setCharacterLoading(true)
+        getCharactersAndVoices().then(res => {
+          setCharacterList(res.characters as CharacterItem[])
+          setCharacterLoading(false)
+        }).catch(() => setCharacterLoading(false))
+      }
+    } else {
+      setMentionSearch(null)
+    }
+  }
+
   const handleGenerate = () => {
     if (!prompt.trim() || isGenerating) return
     setShowSettings(false)
@@ -201,7 +255,29 @@ export default function AIImageGeneratorPage() {
     })
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionSearch !== null && filteredCharacters.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setMentionIndex(i => (i + 1) % filteredCharacters.length)
+        return
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setMentionIndex(i => (i - 1 + filteredCharacters.length) % filteredCharacters.length)
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault()
+        selectMention(filteredCharacters[mentionIndex])
+        return
+      }
+      if (e.key === "Escape") {
+        setMentionSearch(null)
+        return
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleGenerate()
@@ -441,6 +517,37 @@ export default function AIImageGeneratorPage() {
           )}
 
           <div className="relative flex items-end gap-2 rounded-2xl border border-border bg-card/95 p-2 pl-3 backdrop-blur-xl shadow-2xl">
+            {mentionSearch !== null && (filteredCharacters.length > 0 || characterLoading) && (
+              <div className="absolute bottom-full left-12 mb-2 w-64 max-h-48 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-2xl backdrop-blur-xl z-50">
+                {characterLoading && filteredCharacters.length === 0 ? (
+                  <div className="flex items-center justify-center py-4 text-muted-foreground">
+                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : (
+                  filteredCharacters.map((char, i) => (
+                    <button
+                      key={char.characterRefId}
+                      onClick={() => selectMention(char)}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-all",
+                        mentionIndex === i ? "bg-violet-500/10 text-violet-400" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      )}
+                    >
+                      {char.imageUrl1 ? (
+                        <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md">
+                          <Image src={char.imageUrl1} alt={char.displayName} fill className="object-cover" unoptimized />
+                        </div>
+                      ) : (
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-500/20">
+                          <UsersIcon className="h-3 w-3 text-violet-400" />
+                        </div>
+                      )}
+                      <span className="truncate font-medium">{char.displayName}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
             <div className="relative" ref={plusMenuRef}>
               <button onClick={() => setShowPlusMenu(!showPlusMenu)} className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-muted hover:text-foreground">
                 <PlusIcon className="h-5 w-5" />
@@ -468,8 +575,9 @@ export default function AIImageGeneratorPage() {
             <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={handleFileUpload} />
 
             <textarea
+              ref={textareaRef}
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={handlePromptChange}
               onKeyDown={handleKeyDown}
               placeholder="Apa yang ingin Anda buat?"
               rows={1}

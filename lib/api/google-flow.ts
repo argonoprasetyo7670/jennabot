@@ -216,6 +216,67 @@ export async function upscaleImage(
  * Download a base64-encoded image as a file.
  * Used for upscaled images which are returned as base64.
  */
+export async function base64ToBlob(base64: string, contentType: string): Promise<Blob> {
+  const byteCharacters = atob(base64)
+  const byteArrays = []
+
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512)
+    const byteNumbers = new Array(slice.length)
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i)
+    }
+    const byteArray = new Uint8Array(byteNumbers)
+    byteArrays.push(byteArray)
+  }
+
+  return new Blob(byteArrays, { type: contentType })
+}
+
+/* ─── Upscale Video ─── */
+
+export interface UpscaleVideoResult {
+  videoUrl: string
+  thumbnailUrl: string
+  mediaGenerationId: string
+  creditsDeducted: number
+}
+
+/**
+ * Upscale a generated video to 1080p or 4K resolution.
+ */
+export async function upscaleGoogleVideo(
+  mediaGenerationId: string,
+  resolution: "1080p" | "4K" = "1080p"
+): Promise<UpscaleVideoResult> {
+  const res = await fetch("/api/ai/video-upscale", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mediaGenerationId, resolution }),
+  })
+
+  let data: Record<string, unknown>
+  try {
+    data = await res.json()
+  } catch {
+    throw new Error(!res.ok ? `Upscale failed (${res.status})` : "Invalid response from server")
+  }
+
+  if (!res.ok) {
+    const errMsg = typeof data.error === "string" 
+      ? data.error 
+      : (data.error as { message?: string })?.message || `Upscale failed (${res.status})`
+    throw new Error(errMsg)
+  }
+
+  return {
+    videoUrl: data.videoUrl as string,
+    thumbnailUrl: (data.thumbnailUrl as string) || "",
+    mediaGenerationId: (data.mediaGenerationId as string) || mediaGenerationId,
+    creditsDeducted: (data.creditsDeducted as number) || 0,
+  }
+}
+
 export function downloadBase64Image(base64: string, filename: string) {
   const byteChars = atob(base64)
   const byteNumbers = new Array(byteChars.length)
