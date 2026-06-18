@@ -35,7 +35,7 @@ function friendlyGenerateError(status: number, rawError: string): string {
   if (status === 401 || status === 403)
     return "Sesi login habis. Silakan refresh halaman dan login ulang."
   if (status === 400 || lower.includes("invalid") || lower.includes("bad request"))
-    return "Parameter tidak valid. Pastikan prompt dan referensi sudah benar."
+    return "Gambar atau video tidak valid. Pastikan prompt dan referensi sudah benar."
   if (status === 503 || status === 502 || lower.includes("unavailable") || lower.includes("maintenance"))
     return "Layanan video generation sedang maintenance. Coba lagi nanti."
   if (lower.includes("timeout") || lower.includes("timed out"))

@@ -549,9 +549,55 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
     return (window as any).__jenna_saved_media__ as Set<string>
   }
 
-  // Auto-save all completed jobs to gallery (works even if user navigated away from generator page)
+  // Auto-save all completed jobs to gallery and replace temp URLs with permanent CDN URLs.
+  // Uses a debounced batch approach: collect all URL replacements, apply once after saves complete.
+  // This avoids the infinite loop where updateJobInStore → jobs change → useEffect re-fires.
   React.useEffect(() => {
     const saved = getSavedSet()
+    // Track pending URL replacements outside the store (no re-render until batch apply)
+    const pendingReplacements: Array<{
+      jobId: string
+      type: "image" | "video"
+      oldUrl: string
+      newUrl: string
+    }> = []
+    let pendingCount = 0
+
+    const applyReplacements = () => {
+      if (pendingReplacements.length === 0) return
+      // Group by jobId and apply all at once
+      const byJob = new Map<string, typeof pendingReplacements>()
+      for (const r of pendingReplacements) {
+        if (!byJob.has(r.jobId)) byJob.set(r.jobId, [])
+        byJob.get(r.jobId)!.push(r)
+      }
+      for (const [jobId, replacements] of byJob) {
+        const currentStore = getStore()
+        const currentJob = currentStore.jobs.find(j => j.id === jobId)
+        if (!currentJob) continue
+        const updates: Partial<GenerationJob> = {}
+        const imgReplacements = replacements.filter(r => r.type === "image")
+        const vidReplacements = replacements.filter(r => r.type === "video")
+        if (imgReplacements.length > 0 && currentJob.images) {
+          updates.images = currentJob.images.map(img => {
+            const rep = imgReplacements.find(r => r.oldUrl === img.url)
+            return rep ? { ...img, url: rep.newUrl } : img
+          })
+        }
+        if (vidReplacements.length > 0 && currentJob.videos) {
+          updates.videos = currentJob.videos.map(vid => {
+            const storageUrl = (vid as any).rawUrl || vid.url
+            const rep = vidReplacements.find(r => r.oldUrl === storageUrl)
+            return rep ? { ...vid, url: rep.newUrl, rawUrl: rep.newUrl } : vid
+          })
+        }
+        // Pre-add all new URLs to saved set BEFORE updating store
+        for (const r of replacements) saved.add(r.newUrl)
+        if (Object.keys(updates).length > 0) updateJobInStore(jobId, updates)
+      }
+      pendingReplacements.length = 0
+    }
+
     for (const job of jobs) {
       if (job.status !== "done") continue
 
@@ -559,6 +605,7 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
       for (const img of job.images || []) {
         if (!img.url || saved.has(img.url)) continue
         saved.add(img.url)
+        pendingCount++
         fetch("/api/gallery/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -573,25 +620,20 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
           }),
         }).then(res => res.json()).then(data => {
           if (data.item?.gcsUrl) {
-            // Pre-add CDN URL to saved set BEFORE updating store
-            // This prevents re-save when jobs array changes from URL update
-            saved.add(data.item.gcsUrl)
-            const currentStore = getStore()
-            const currentJob = currentStore.jobs.find(j => j.id === job.id)
-            if (currentJob && currentJob.images) {
-              const updatedImages = currentJob.images.map(i => i.url === img.url ? { ...i, url: data.item.gcsUrl } : i)
-              updateJobInStore(job.id, { images: updatedImages })
-            }
+            pendingReplacements.push({ jobId: job.id, type: "image", oldUrl: img.url, newUrl: data.item.gcsUrl })
           }
-        }).catch(() => { })
+        }).catch(() => { }).finally(() => {
+          pendingCount--
+          if (pendingCount === 0) applyReplacements()
+        })
       }
 
       // Save videos
       for (const vid of job.videos || []) {
-        // Use rawUrl for storage (not proxy URL)
         const storageUrl = (vid as { rawUrl?: string; url: string }).rawUrl || vid.url
         if (!storageUrl || saved.has(storageUrl)) continue
         saved.add(storageUrl)
+        pendingCount++
         fetch("/api/gallery/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -606,20 +648,12 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
           }),
         }).then(res => res.json()).then(data => {
           if (data.item?.gcsUrl) {
-            // Pre-add CDN URL to saved set BEFORE updating store
-            saved.add(data.item.gcsUrl)
-            const currentStore = getStore()
-            const currentJob = currentStore.jobs.find(j => j.id === job.id)
-            if (currentJob && currentJob.videos) {
-              const updatedVideos = currentJob.videos.map(v => 
-                ((v as any).rawUrl || v.url) === storageUrl 
-                  ? { ...v, url: data.item.gcsUrl, rawUrl: data.item.gcsUrl } 
-                  : v
-              )
-              updateJobInStore(job.id, { videos: updatedVideos })
-            }
+            pendingReplacements.push({ jobId: job.id, type: "video", oldUrl: storageUrl, newUrl: data.item.gcsUrl })
           }
-        }).catch(() => { })
+        }).catch(() => { }).finally(() => {
+          pendingCount--
+          if (pendingCount === 0) applyReplacements()
+        })
       }
     }
   }, [jobs])
