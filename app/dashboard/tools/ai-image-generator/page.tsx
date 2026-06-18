@@ -238,6 +238,11 @@ export default function AIImageGeneratorPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
+    const oversized = files.find(f => f.size > 4.5 * 1024 * 1024)
+    if (oversized) {
+      alert("Ukuran file maksimal adalah 4.5 MB")
+      return
+    }
     const remaining = currentModel.maxRefs - referenceImages.length
     const newRefs: ReferenceImage[] = files.slice(0, remaining).map((file) => ({
       file,

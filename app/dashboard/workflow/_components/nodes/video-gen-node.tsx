@@ -78,8 +78,10 @@ export function VideoGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
 
   const selectedCharacters = (nd._selectedCharacters as CharacterItem[]) || []
 
-  // imageMode forced to "reference" if characters exist
-  const imageMode = selectedCharacters.length > 0 ? "reference" : ((nd.imageMode as string) || "start")
+  // imageMode forced to "reference" if characters exist or omni-flash is selected
+  const isOmniFlash = (nd.model as string) === "omni-flash"
+  const forceReference = selectedCharacters.length > 0 || isOmniFlash
+  const imageMode = forceReference ? "reference" : ((nd.imageMode as string) || "start")
 
   const openCharacterPicker = useCallback(async () => {
     setShowCharacterPicker(true)
@@ -149,13 +151,13 @@ export function VideoGenNodeComponent({ data, id: nodeId, selected }: NodeProps)
           <div className="px-2 py-1.5 space-y-1">
             <label className="text-[10px] font-medium text-muted-foreground">Mode Input</label>
             <div className="flex bg-muted/50 p-0.5 rounded-lg border border-border/50 relative">
-              {selectedCharacters.length > 0 && (
-                <div className="absolute inset-0 z-10 cursor-not-allowed" title="Karakter aktif memaksa mode referensi" />
+              {forceReference && (
+                <div className="absolute inset-0 z-10 cursor-not-allowed" title={isOmniFlash ? "Omni Flash tidak mendukung Start Frame" : "Karakter aktif memaksa mode referensi"} />
               )}
               <button
                 onClick={() => { updateNodeData(nodeId, { imageMode: "start" }); setMenuOpen(false) }}
-                disabled={isGenerating || selectedCharacters.length > 0}
-                className={cn("flex-1 flex items-center justify-center py-1 text-[10px] font-medium rounded-md transition-all", imageMode === "start" ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground", selectedCharacters.length > 0 && "opacity-50")}
+                disabled={isGenerating || forceReference}
+                className={cn("flex-1 flex items-center justify-center py-1 text-[10px] font-medium rounded-md transition-all", imageMode === "start" ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground", forceReference && "opacity-50")}
               >
                 Frame
               </button>

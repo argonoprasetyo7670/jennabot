@@ -101,6 +101,7 @@ const navItems: NavItem[] = [
     type: "collapsible",
     items: [
       { title: "AI Video Generator", url: "/dashboard/tools/ai-video-generator" },
+      { title: "Omniflash Motion", url: "/dashboard/tools/omniflash-motion" },
       { title: "Review Product", url: "/dashboard/review-product" },
       { title: "Seedance 2.0", url: "/dashboard/seedance" },
       { title: "Motion Control", url: "/dashboard/motion-control" },

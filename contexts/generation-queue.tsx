@@ -301,10 +301,11 @@ function submitJobToStore(
 function submitVideoJobToStore(
   params: GenerateVideoParams,
   references?: { file?: File; galleryUrl?: string }[],
-  frameRefs?: { startImage?: { file?: File; galleryUrl?: string }; endImage?: { file?: File; galleryUrl?: string } }
+  frameRefs?: { startImage?: { file?: File; galleryUrl?: string }; endImage?: { file?: File; galleryUrl?: string } },
+  videoRef?: { file?: File; galleryUrl?: string }
 ): string {
   const id = `vjob-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const hasUploads = (references?.length ?? 0) > 0 || !!frameRefs?.startImage || !!frameRefs?.endImage
+  const hasUploads = (references?.length ?? 0) > 0 || !!frameRefs?.startImage || !!frameRefs?.endImage || !!videoRef
 
   const job: GenerationJob = {
     id,
@@ -326,6 +327,21 @@ function submitVideoJobToStore(
       try {
         let email: string | undefined = params.email
         const videoParams: GenerateVideoParams = { ...params }
+
+        // Upload video reference (for V2V)
+        if (videoRef) {
+          updateJobInStore(id, { status: "uploading", progress: "Mengupload video referensi..." })
+          let result
+          if (videoRef.file) {
+            result = await uploadImageAsset(videoRef.file, email)
+          } else if (videoRef.galleryUrl) {
+            result = await uploadImageFromUrl(videoRef.galleryUrl, email)
+          }
+          if (result) {
+            if (!email && result.email) email = result.email
+            videoParams.referenceVideo = result.mediaGenerationId
+          }
+        }
 
         // Upload start frame
         if (frameRefs?.startImage) {
@@ -396,6 +412,7 @@ function submitVideoJobToStore(
         if (videoParams.endImage) body.endImage = videoParams.endImage
         if (videoParams.voice) body.voice = videoParams.voice
         if (videoParams.referenceImages?.length) body.referenceImages = videoParams.referenceImages
+        if (videoParams.referenceVideo) body.referenceVideo_1 = videoParams.referenceVideo
 
         // Pass character refs as character_1..N
         if (params.characters?.length) {
@@ -502,7 +519,8 @@ interface GenerationQueueContextValue {
   submitVideoJob: (
     params: GenerateVideoParams,
     references?: { file?: File; galleryUrl?: string }[],
-    frameRefs?: { startImage?: { file?: File; galleryUrl?: string }; endImage?: { file?: File; galleryUrl?: string } }
+    frameRefs?: { startImage?: { file?: File; galleryUrl?: string }; endImage?: { file?: File; galleryUrl?: string } },
+    videoRef?: { file?: File; galleryUrl?: string }
   ) => string
   addCustomJob: (job: GenerationJob) => void
   updateJob: (id: string, updates: Partial<GenerationJob>) => void

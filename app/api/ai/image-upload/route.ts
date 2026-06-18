@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       const contentType = req.headers.get("content-type") || ""
       fileType = contentType.split(";")[0].trim()
 
-      const allowedTypes = ["image/png", "image/jpeg", "image/webp"]
+      const allowedTypes = ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm", "video/quicktime"]
       if (!allowedTypes.includes(fileType)) {
         return NextResponse.json(
           { error: `Unsupported type: ${fileType}. Use PNG, JPEG, or WebP.` },
@@ -44,9 +44,9 @@ export async function POST(req: NextRequest) {
       buffer = await req.arrayBuffer()
     }
 
-    // Max 20MB
-    if (buffer.byteLength > 20 * 1024 * 1024) {
-      return NextResponse.json({ error: "File size exceeds 20MB limit" }, { status: 400 })
+    // Max 4.5MB
+    if (buffer.byteLength > 4.5 * 1024 * 1024) {
+      return NextResponse.json({ error: "File size exceeds 4.5MB limit" }, { status: 400 })
     }
 
     // Build URL: /assets or /assets/:email

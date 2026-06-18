@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       prompt, model, aspectRatio, duration, count, seed,
-      startImage, endImage, referenceImages, voice, email,
+      startImage, endImage, referenceImages, referenceVideo_1, voice, email,
       feature, characters,
     } = body
 
@@ -190,6 +190,10 @@ export async function POST(req: NextRequest) {
     //   basePayload.replyRef = `jenna-${Date.now()}`
     //   console.log(`[video-generate] replyUrl set: ${basePayload.replyUrl}`)
     // }
+
+    if (referenceVideo_1) {
+      basePayload.referenceVideo_1 = referenceVideo_1
+    }
 
     if (referenceImages && Array.isArray(referenceImages)) {
       referenceImages.forEach((ref: string, i: number) => {

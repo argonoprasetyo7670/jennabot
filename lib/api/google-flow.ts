@@ -42,12 +42,12 @@ export interface UploadAssetResult {
  * Pass `email` to force upload to a specific Google account.
  */
 export async function uploadImageAsset(file: File, email?: string): Promise<UploadAssetResult> {
-  const allowedTypes = ["image/png", "image/jpeg", "image/webp"]
+  const allowedTypes = ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm", "video/quicktime"]
   if (!allowedTypes.includes(file.type)) {
     throw new Error(`Unsupported file type: ${file.type}. Use PNG, JPEG, or WebP.`)
   }
-  if (file.size > 20 * 1024 * 1024) {
-    throw new Error("File size exceeds 20MB limit")
+  if (file.size > 4.5 * 1024 * 1024) {
+    throw new Error("File size exceeds 4.5MB limit")
   }
 
   const params = new URLSearchParams()
@@ -321,6 +321,7 @@ export interface GenerateVideoParams {
   startImage?: string
   endImage?: string
   referenceImages?: string[]
+  referenceVideo?: string
   characters?: string[]  // character ref IDs → character_1..7
   voice?: string
   email?: string
@@ -367,6 +368,9 @@ export async function generateVideos(params: GenerateVideoParams): Promise<Gener
   if (params.endImage) body.endImage = params.endImage
   if (params.voice) body.voice = params.voice
 
+  if (params.referenceVideo) {
+    body.referenceVideo_1 = params.referenceVideo
+  }
   if (params.referenceImages?.length) {
     body.referenceImages = params.referenceImages
   }

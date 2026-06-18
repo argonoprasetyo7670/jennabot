@@ -150,6 +150,13 @@ export default function AIVideoGeneratorPage() {
     }
   }, [activeModel.id, selectedDuration])
 
+  // Auto-switch to reference mode if omni-flash is selected
+  useEffect(() => {
+    if (activeModel.id === "omni-flash" && imageMode === "start") {
+      setImageMode("reference")
+    }
+  }, [activeModel.id, imageMode])
+
   // Fetch characters for picker
   const openCharacterPicker = useCallback(async () => {
     setShowPlusMenu(false)
@@ -279,6 +286,11 @@ export default function AIVideoGeneratorPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
+    const oversized = files.find(f => f.size > 4.5 * 1024 * 1024)
+    if (oversized) {
+      alert("Ukuran file maksimal adalah 4.5 MB")
+      return
+    }
     const maxRefs = imageMode === "start" ? 2 : 3
     const remaining = maxRefs - referenceImages.length
     const newRefs: ReferenceImage[] = files.slice(0, remaining).map((file) => ({
@@ -494,17 +506,17 @@ export default function AIVideoGeneratorPage() {
           <div className="mb-2">
             <div className="flex gap-1 mb-2 bg-muted/40 p-0.5 rounded-lg border border-border/50 max-w-fit mx-auto">
               <button
-                onClick={() => { if (selectedCharacters.length === 0) setImageMode("start") }}
-                disabled={selectedCharacters.length > 0}
+                onClick={() => { if (selectedCharacters.length === 0 && activeModel.id !== "omni-flash") setImageMode("start") }}
+                disabled={selectedCharacters.length > 0 || activeModel.id === "omni-flash"}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium rounded-md transition-all",
-                  selectedCharacters.length > 0
+                  (selectedCharacters.length > 0 || activeModel.id === "omni-flash")
                     ? "text-muted-foreground/30 cursor-not-allowed"
                     : imageMode === "start"
                       ? "bg-background text-foreground shadow-sm border border-border/50"
                       : "text-muted-foreground hover:text-foreground"
                 )}
-                title={selectedCharacters.length > 0 ? "Tidak bisa pakai Start Frame saat ada Character" : undefined}
+                title={selectedCharacters.length > 0 ? "Tidak bisa pakai Start Frame saat ada Character" : activeModel.id === "omni-flash" ? "Omni Flash tidak mendukung Start Frame" : undefined}
               >
                 <FrameIcon className="h-3 w-3" /> Start Frame
               </button>
