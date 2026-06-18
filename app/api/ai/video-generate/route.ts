@@ -193,6 +193,10 @@ export async function POST(req: NextRequest) {
 
     if (referenceVideo_1) {
       basePayload.referenceVideo_1 = referenceVideo_1
+      // V2V edit: output length matches input trim window — duration is rejected
+      if (modelToUse === "omni-flash") {
+        delete basePayload.duration
+      }
     }
 
     if (referenceImages && Array.isArray(referenceImages)) {
