@@ -97,9 +97,9 @@ function extractMedia(data: Record<string, unknown>): Record<string, unknown>[] 
     const gv = m.generatedVideo as Record<string, unknown> | undefined;
     const meta = m.metadata as Record<string, unknown> | undefined;
     const metaV = meta?.video as Record<string, unknown> | undefined;
-    
+
     const url = m.fifeUrl || m.uri || m.url || v?.fifeUrl || v?.uri || gv?.fifeUrl || gv?.uri || metaV?.fifeUrl || metaV?.servingBaseUri || metaV?.uri;
-    
+
     return {
       ...m,
       videoUrl: url,
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
       aspectRatio: aspectRatio || "landscape",
       duration: duration || 8,
       count: videoCount,
-      captchaRetry: 5,
+      // captchaRetry: 5,
     }
 
     // Feature for credit cost identification
@@ -306,7 +306,7 @@ export async function POST(req: NextRequest) {
 
       if (!response.ok) {
         const errMsg = (data.error as string) || `API error: ${response.status}`
-        
+
         // V2V moderation auto-retry (sync mode): resubmit the same body
         if (isModerationError(errMsg) && attempt < MAX_CAPTCHA_RETRIES) {
           console.warn(`[video-generate] Moderation error on attempt ${attempt}, retrying: ${errMsg}`)
@@ -353,7 +353,7 @@ async function handlePostResponse(
     const media = extractMedia(data)
     console.log(`[video-generate] Sync job done: ${useapiJobId}, videos=${media.length}`)
     const costPerVideo = feature === "omni-flash" ? 50 : CREDIT_COST_VIDEO
-    
+
     // Check subscription — skip credit deduction for subscribers
     const activeSub = await checkSubscription(userId)
     let deducted = 0
