@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12);
     const id = crypto.randomUUID();
 
+    const referralCode = "JNA" + crypto.randomBytes(3).toString("hex").toUpperCase();
     const user = await prisma.users.create({
       data: {
         id,
@@ -42,6 +43,23 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         name: name || email.split("@")[0],
         updatedAt: new Date(),
+        referralCode,
+        user_credits: {
+          create: {
+            id: crypto.randomUUID(),
+            balance: 70,
+            updatedAt: new Date(),
+          }
+        },
+        credit_transactions: {
+          create: {
+            id: crypto.randomUUID(),
+            type: "bonus",
+            amount: 70,
+            balance: 70,
+            description: "Free signup bonus",
+          }
+        }
       },
     });
 

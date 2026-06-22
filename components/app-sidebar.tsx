@@ -24,6 +24,7 @@ import {
   SparklesIcon,
   ShoppingBagIcon,
   UserIcon,
+  UsersIcon,
   LayoutTemplateIcon,
   PenToolIcon,
   VideoIcon,
@@ -146,6 +147,12 @@ const navItems: NavItem[] = [
     title: "Buy Credits",
     url: "/dashboard/buy-credits",
     icon: <CoinsIcon className="h-4 w-4" />,
+    type: "link",
+  },
+  {
+    title: "Referral",
+    url: "/dashboard/referral",
+    icon: <UsersIcon className="h-4 w-4" />,
     type: "link",
   },
   {

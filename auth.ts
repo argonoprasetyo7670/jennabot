@@ -129,6 +129,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
             if (!dbUser) {
               // Create new user from Google profile
+              const referralCode = "JNA" + crypto.randomBytes(3).toString("hex").toUpperCase();
               dbUser = await prisma.users.create({
                 data: {
                   id: crypto.randomUUID(),
@@ -137,6 +138,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   image: (profile as Record<string, unknown>).picture as string ?? null,
                   emailVerified: new Date(),
                   updatedAt: new Date(),
+                  referralCode,
+                  user_credits: {
+                    create: {
+                      id: crypto.randomUUID(),
+                      balance: 70,
+                      updatedAt: new Date(),
+                    }
+                  },
+                  credit_transactions: {
+                    create: {
+                      id: crypto.randomUUID(),
+                      type: "bonus",
+                      amount: 70,
+                      balance: 70,
+                      description: "Free signup bonus",
+                    }
+                  }
                 },
               });
             }

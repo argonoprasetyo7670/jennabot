@@ -18,7 +18,6 @@ import {
   StarIcon,
   ImageIcon,
   VideoIcon,
-  MicIcon,
   LayersIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -110,6 +109,7 @@ export default function SubscriptionPage() {
   const [purchasing, setPurchasing] = useState<string | null>(null)
   const [snapReady, setSnapReady] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
 
   // Promo code states
   const [promoInput, setPromoInput] = useState("")
@@ -124,6 +124,12 @@ export default function SubscriptionPage() {
       if (res.ok) {
         const data = await res.json()
         setPlans(data.plans || [])
+        const popular = data.plans?.find((p: SubscriptionPlan) => p.isPopular)
+        if (popular) {
+          setSelectedPlanId(popular.id)
+        } else if (data.plans?.length > 0) {
+          setSelectedPlanId(data.plans[0].id)
+        }
       }
     } catch {
       console.error("Failed to fetch plans")
@@ -223,7 +229,7 @@ export default function SubscriptionPage() {
         },
         onPending: () => showToast("Menunggu pembayaran...", "info"),
         onError: () => showToast("Pembayaran gagal. Silakan coba lagi.", "error"),
-        onClose: () => {},
+        onClose: () => { },
       })
     } catch {
       showToast("Terjadi kesalahan. Silakan coba lagi.", "error")
@@ -403,13 +409,15 @@ export default function SubscriptionPage() {
                 const style = TIER_STYLES[plan.name] || DEFAULT_STYLE
                 const pricePerDay = Math.round(plan.price / plan.duration)
                 const isCurrentPlan = isSubscribed && subscription?.plan === plan.name
+                const isSelected = selectedPlanId === plan.id
 
                 return (
                   <div
                     key={plan.id}
+                    onClick={() => setSelectedPlanId(plan.id)}
                     className={cn(
-                      "group relative flex flex-col overflow-hidden rounded-2xl border bg-card/80 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:-translate-y-1",
-                      plan.isPopular
+                      "group relative flex flex-col overflow-hidden rounded-2xl border bg-card/80 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 cursor-pointer",
+                      isSelected
                         ? `border-violet-500/50 shadow-xl shadow-violet-500/20 ring-1 ${style.ring}`
                         : "border-border hover:border-muted-foreground/30",
                       isCurrentPlan && "ring-2 ring-green-500/50 border-green-500/30",
@@ -497,13 +505,17 @@ export default function SubscriptionPage() {
                     {/* Buy button */}
                     <div className="px-5 pb-5">
                       <button
-                        onClick={() => handlePurchase(plan)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedPlanId(plan.id)
+                          handlePurchase(plan)
+                        }}
                         disabled={purchasing !== null || isCurrentPlan}
                         className={cn(
                           "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all duration-300",
                           isCurrentPlan
                             ? "bg-green-500/10 text-green-400 border border-green-500/30 cursor-default"
-                            : plan.isPopular
+                            : isSelected
                               ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:brightness-110"
                               : `${style.bg} text-foreground hover:brightness-125 border border-border/50`,
                           purchasing === plan.id && "opacity-70 cursor-wait"
@@ -567,7 +579,7 @@ export default function SubscriptionPage() {
             "flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium shadow-2xl backdrop-blur-xl",
             toast.type === "success" ? "border-green-500/30 bg-green-500/15 text-green-400"
               : toast.type === "error" ? "border-red-500/30 bg-red-500/15 text-red-400"
-              : "border-blue-500/30 bg-blue-500/15 text-blue-400"
+                : "border-blue-500/30 bg-blue-500/15 text-blue-400"
           )}>
             {toast.type === "success" && <CheckIcon className="h-4 w-4" />}
             {toast.type === "error" && <span>✕</span>}

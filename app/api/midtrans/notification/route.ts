@@ -112,10 +112,10 @@ export async function POST(req: NextRequest) {
     if (newStatus === "success" && transaction.status !== "success") {
       if (order_id.startsWith("SUB-")) {
         // ── Subscription purchase ──
-        await activateSubscriptionFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode)
+        await activateSubscriptionFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode, transaction.amount)
       } else {
         // ── Credit purchase ──
-        await addCreditsFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode)
+        await addCreditsFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode, transaction.amount)
       }
     }
 
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 /**
  * Parse credits from the plan name and add to user balance
  */
-async function addCreditsFromPurchase(userId: string, plan: string, orderId: string, promoCode: string | null) {
+async function addCreditsFromPurchase(userId: string, plan: string, orderId: string, promoCode: string | null, transactionAmount: number) {
   // Plan format: "Pro - 550 Credits"
   const creditsMatch = plan.match(/(\d+)\s*Credits/i)
   if (!creditsMatch) {
@@ -174,14 +174,40 @@ async function addCreditsFromPurchase(userId: string, plan: string, orderId: str
     }),
   ]
 
-  // Jika transaksi memakai kode promo, tambahkan ke counter promo_codes
+  // Jika transaksi memakai kode promo, tambahkan ke counter promo_codes atau berikan komisi referral
   if (promoCode) {
-    transactionOperations.push(
-      prisma.promo_codes.update({
-        where: { code: promoCode },
-        data: { currentUses: { increment: 1 } },
-      }) as any
-    )
+    const isPromo = await prisma.promo_codes.findUnique({ where: { code: promoCode } })
+    if (isPromo) {
+      transactionOperations.push(
+        prisma.promo_codes.update({
+          where: { code: promoCode },
+          data: { currentUses: { increment: 1 } },
+        }) as any
+      )
+    } else {
+      const referrer = await prisma.users.findUnique({ where: { referralCode: promoCode } })
+      if (referrer) {
+        const commission = Math.floor(transactionAmount * 0.1)
+        transactionOperations.push(
+          prisma.users.update({
+            where: { id: referrer.id },
+            data: { referralEarnings: { increment: commission } }
+          }) as any
+        )
+        transactionOperations.push(
+          prisma.referrals.create({
+            data: {
+              id: crypto.randomUUID(),
+              referrerId: referrer.id,
+              referredId: userId,
+              status: "success",
+              reward: commission,
+              updatedAt: new Date()
+            }
+          }) as any
+        )
+      }
+    }
   }
 
   await prisma.$transaction(transactionOperations)
@@ -195,7 +221,7 @@ async function addCreditsFromPurchase(userId: string, plan: string, orderId: str
  * Activate subscription from a successful Midtrans payment.
  * Plan format: "Langganan Pro - 14 Hari"
  */
-async function activateSubscriptionFromPurchase(userId: string, plan: string, orderId: string, promoCode: string | null) {
+async function activateSubscriptionFromPurchase(userId: string, plan: string, orderId: string, promoCode: string | null, transactionAmount: number) {
   // Parse plan name from transaction plan string
   const nameMatch = plan.match(/Langganan\s+(\w+)/i)
   const planName = nameMatch ? nameMatch[1] : "Unknown"
@@ -212,14 +238,36 @@ async function activateSubscriptionFromPurchase(userId: string, plan: string, or
 
   await activateSubscription(userId, dbPlan.id, dbPlan.name, dbPlan.duration, dbPlan.price)
 
-  // Increment promo usage if applicable
+  // Increment promo usage or give referral commission
   if (promoCode) {
-    await prisma.promo_codes.update({
-      where: { code: promoCode },
-      data: { currentUses: { increment: 1 } },
-    }).catch(() => {
-      console.warn(`[subscription] Failed to increment promo usage: ${promoCode}`)
-    })
+    const isPromo = await prisma.promo_codes.findUnique({ where: { code: promoCode } })
+    if (isPromo) {
+      await prisma.promo_codes.update({
+        where: { code: promoCode },
+        data: { currentUses: { increment: 1 } },
+      }).catch(() => {
+        console.warn(`[subscription] Failed to increment promo usage: ${promoCode}`)
+      })
+    } else {
+      const referrer = await prisma.users.findUnique({ where: { referralCode: promoCode } })
+      if (referrer) {
+        const commission = Math.floor(transactionAmount * 0.1)
+        await prisma.users.update({
+          where: { id: referrer.id },
+          data: { referralEarnings: { increment: commission } }
+        }).catch(() => {})
+        await prisma.referrals.create({
+          data: {
+            id: crypto.randomUUID(),
+            referrerId: referrer.id,
+            referredId: userId,
+            status: "success",
+            reward: commission,
+            updatedAt: new Date()
+          }
+        }).catch(() => {})
+      }
+    }
   }
 
   console.log(

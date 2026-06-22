@@ -19,13 +19,48 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 })
     }
 
+    const codeStr = code.toUpperCase()
+
+    // Cek apakah ini transaksi pertama user (belum pernah sukses)
+    const successfulTransactionsCount = await prisma.transactions.count({
+      where: {
+        userId: session.user.id,
+        status: { in: ["success", "settlement"] }
+      }
+    })
+    
+    const isFirstTime = successfulTransactionsCount === 0;
+
     // Ambil data promo code
     const promo = await prisma.promo_codes.findUnique({
-      where: { code: code.toUpperCase() },
+      where: { code: codeStr },
     })
 
     if (!promo) {
-      return NextResponse.json({ isValid: false, message: "Kode promo tidak ditemukan" })
+      // Jika bukan promo biasa, cek apakah itu kode referral
+      const referrer = await prisma.users.findUnique({
+        where: { referralCode: codeStr }
+      })
+
+      if (referrer) {
+        if (referrer.id === session.user.id) {
+          return NextResponse.json({ isValid: false, message: "Anda tidak bisa menggunakan kode referral milik sendiri" })
+        }
+        
+        if (!isFirstTime) {
+          return NextResponse.json({ isValid: false, message: "Kode referral hanya berlaku untuk pembelian pertama" })
+        }
+
+        return NextResponse.json({
+          isValid: true,
+          message: "Kode referral berhasil diaplikasikan",
+          code: referrer.referralCode,
+          discountType: "percent",
+          discountValue: 10,
+        })
+      }
+
+      return NextResponse.json({ isValid: false, message: "Kode promo atau referral tidak ditemukan" })
     }
 
     // Validasi status aktif

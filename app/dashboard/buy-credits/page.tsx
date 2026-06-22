@@ -110,6 +110,7 @@ export default function BuyCreditsPage() {
   const [purchasing, setPurchasing] = useState<string | null>(null)
   const [snapReady, setSnapReady] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null)
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
 
   // Promo code states
   const [promoInput, setPromoInput] = useState("")
@@ -124,6 +125,12 @@ export default function BuyCreditsPage() {
       if (res.ok) {
         const data = await res.json()
         setPackages(data.packages || [])
+        const popular = data.packages?.find((p: CreditPackage) => p.isPopular)
+        if (popular) {
+          setSelectedPackageId(popular.id)
+        } else if (data.packages?.length > 0) {
+          setSelectedPackageId(data.packages[0].id)
+        }
       }
     } catch {
       console.error("Failed to fetch packages")
@@ -358,13 +365,15 @@ export default function BuyCreditsPage() {
                 const totalCredits = pkg.credits + pkg.bonusCredits
                 const imagesCount = Math.floor(totalCredits / CREDIT_COST_IMAGE)
                 const videosCount = Math.floor(totalCredits / CREDIT_COST_VIDEO)
+                const isSelected = selectedPackageId === pkg.id
 
                 return (
                   <div
                     key={pkg.id}
+                    onClick={() => setSelectedPackageId(pkg.id)}
                     className={cn(
-                      "group relative flex flex-col overflow-hidden rounded-2xl border bg-card/80 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:-translate-y-1",
-                      pkg.isPopular
+                      "group relative flex flex-col overflow-hidden rounded-2xl border bg-card/80 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 cursor-pointer",
+                      isSelected
                         ? `border-violet-500/50 shadow-xl shadow-violet-500/20 ring-1 ${tier.ring}`
                         : "border-border hover:border-muted-foreground/30",
                       tier.glow
@@ -459,11 +468,15 @@ export default function BuyCreditsPage() {
                     {/* Buy button */}
                     <div className="px-5 pb-5">
                       <button
-                        onClick={() => handlePurchase(pkg)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedPackageId(pkg.id)
+                          handlePurchase(pkg)
+                        }}
                         disabled={purchasing !== null}
                         className={cn(
                           "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all duration-300",
-                          pkg.isPopular
+                          isSelected
                             ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:brightness-110"
                             : `${tier.bg} text-foreground hover:brightness-125 border border-border/50`,
                           purchasing === pkg.id && "opacity-70 cursor-wait"
