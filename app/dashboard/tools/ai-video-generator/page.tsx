@@ -29,7 +29,7 @@ import { getCharactersAndVoices } from "@/app/dashboard/characters/actions"
 
 /* ─── Constants ─── */
 const MODELS = [
-  { id: "veo-3.1-lite-low-priority" as const, name: "Veo 3.1 Lite (Low Priority)", cost: 5 },
+  { id: "veo-3.1-lite-low-priority" as const, name: "Veo 3.1", cost: 5 },
   { id: "omni-flash" as const, name: "Omni Flash", cost: 50 },
 ]
 const ASPECT_RATIOS: VideoAspectRatio[] = ["landscape", "portrait"]
@@ -206,13 +206,13 @@ export default function AIVideoGeneratorPage() {
       const mentionStart = cursor - match[0].length + (match[0].startsWith(" ") ? 1 : 0)
       const newPrompt = prompt.slice(0, mentionStart) + `[${char.displayName}] ` + textAfterCursor
       setPrompt(newPrompt)
-      
+
       if (!selectedCharacters.some(c => c.characterRefId === char.characterRefId)) {
         setImageMode("reference")
         setSelectedCharacters(prev => [...prev, char])
       }
     }
-    
+
     setMentionSearch(null)
     setTimeout(() => {
       textareaRef.current?.focus()
@@ -226,7 +226,7 @@ export default function AIVideoGeneratorPage() {
     const cursor = e.target.selectionStart
     const textBeforeCursor = val.slice(0, cursor)
     const match = textBeforeCursor.match(/(?:\s|^)@([^ ]*)$/)
-    
+
     if (match) {
       setMentionSearch(match[1].toLowerCase())
       setMentionIndex(0)
@@ -415,68 +415,68 @@ export default function AIVideoGeneratorPage() {
             {generatedVideos.map((vid, i) => {
               const expired = isMediaExpired((vid as any).rawUrl, vid.url)
               return (
-              <div key={i} className="overflow-hidden rounded-2xl border border-border bg-muted/30 animate-fade-up">
-                <div className="relative aspect-video cursor-pointer" onClick={() => !expired && setPreviewVideo(vid)}>
-                  {expired ? (
-                    <div className="flex h-full w-full flex-col items-center justify-center bg-muted/50 p-4 text-center">
-                      <VideoIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
-                      <p className="text-sm font-medium text-foreground/70">Kedaluwarsa</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-snug max-w-[200px] mx-auto">Link berlaku 24 jam. Jika sudah tersimpan, lihat di Gallery.</p>
+                <div key={i} className="overflow-hidden rounded-2xl border border-border bg-muted/30 animate-fade-up">
+                  <div className="relative aspect-video cursor-pointer" onClick={() => !expired && setPreviewVideo(vid)}>
+                    {expired ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center bg-muted/50 p-4 text-center">
+                        <VideoIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
+                        <p className="text-sm font-medium text-foreground/70">Kedaluwarsa</p>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-snug max-w-[200px] mx-auto">Link berlaku 24 jam. Jika sudah tersimpan, lihat di Gallery.</p>
+                      </div>
+                    ) : (
+                      <video
+                        src={vid.url}
+                        className="w-full h-full object-contain bg-background"
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border px-3 py-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      {vid.seed !== undefined ? `Seed: ${vid.seed}` : `Video ${i + 1}`}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => !expired && setPreviewVideo(vid)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Preview">
+                        <EyeIcon className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Preview</span>
+                      </button>
+                      <button onClick={() => !expired && handleDownload(vid.url, `generated-video-${i + 1}.mp4`)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Download">
+                        <DownloadIcon className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Download</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (savedVideos.has(vid.url) || expired) return
+                          try {
+                            const res = await fetch("/api/gallery/save", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                url: vid.url,
+                                type: "video",
+                                prompt: activeJob?.prompt || "",
+                                model: activeJob?.model || "",
+                                aspectRatio: vid.aspectRatio || "",
+                                mediaGenerationId: vid.mediaGenerationId || "",
+                                sourceAction: "video-generator",
+                              }),
+                            })
+                            if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
+                          } catch { /* ignore */ }
+                        }}
+                        disabled={savedVideos.has(vid.url) || expired}
+                        className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted", savedVideos.has(vid.url) ? "text-emerald-500" : expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground")}
+                        title="Simpan ke Gallery"
+                      >
+                        <ImagePlusIcon className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">{savedVideos.has(vid.url) ? "Tersimpan ✓" : "Gallery"}</span>
+                      </button>
                     </div>
-                  ) : (
-                    <video
-                      src={vid.url}
-                      className="w-full h-full object-contain bg-background"
-                      muted
-                      loop
-                      autoPlay
-                      playsInline
-                    />
-                  )}
-                </div>
-                <div className="flex items-center justify-between border-t border-border px-3 py-2">
-                  <span className="text-[10px] text-muted-foreground">
-                    {vid.seed !== undefined ? `Seed: ${vid.seed}` : `Video ${i + 1}`}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => !expired && setPreviewVideo(vid)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Preview">
-                      <EyeIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Preview</span>
-                    </button>
-                    <button onClick={() => !expired && handleDownload(vid.url, `generated-video-${i + 1}.mp4`)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Download">
-                      <DownloadIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Download</span>
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (savedVideos.has(vid.url) || expired) return
-                        try {
-                          const res = await fetch("/api/gallery/save", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              url: vid.url,
-                              type: "video",
-                              prompt: activeJob?.prompt || "",
-                              model: activeJob?.model || "",
-                              aspectRatio: vid.aspectRatio || "",
-                              mediaGenerationId: vid.mediaGenerationId || "",
-                              sourceAction: "video-generator",
-                            }),
-                          })
-                          if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
-                        } catch { /* ignore */ }
-                      }}
-                      disabled={savedVideos.has(vid.url) || expired}
-                      className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted", savedVideos.has(vid.url) ? "text-emerald-500" : expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground")}
-                      title="Simpan ke Gallery"
-                    >
-                      <ImagePlusIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{savedVideos.has(vid.url) ? "Tersimpan ✓" : "Gallery"}</span>
-                    </button>
                   </div>
                 </div>
-              </div>
               )
             })}
           </div>
@@ -527,7 +527,7 @@ export default function AIVideoGeneratorPage() {
                 <PuzzleIcon className="h-3 w-3" /> Aset Referensi
               </button>
             </div>
-            
+
             {(referenceImages.length > 0 || selectedCharacters.length > 0) && (
               <div className="flex justify-center gap-2 px-1 overflow-x-auto pb-1">
                 {/* Selected Characters */}

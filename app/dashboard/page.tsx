@@ -311,13 +311,12 @@ function HistoryDialogContent({
             <div className="space-y-2">
               {tab === "credits" && (items as CreditItem[]).map((item) => (
                 <div key={item.id} className="group flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    item.type === "deduct"
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${item.type === "deduct"
                       ? "bg-red-500/10 text-red-500"
                       : item.type === "refund"
-                      ? "bg-amber-500/10 text-amber-500"
-                      : "bg-emerald-500/10 text-emerald-500"
-                  }`}>
+                        ? "bg-amber-500/10 text-amber-500"
+                        : "bg-emerald-500/10 text-emerald-500"
+                    }`}>
                     {item.type === "deduct" ? (
                       <TrendingDownIcon className="h-4 w-4" />
                     ) : (
@@ -347,11 +346,10 @@ function HistoryDialogContent({
 
               {tab === "generations" && (items as GenerationItem[]).map((item) => (
                 <div key={item.id} className="group flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    item.type === "video"
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${item.type === "video"
                       ? "bg-blue-500/10 text-blue-500"
                       : "bg-violet-500/10 text-violet-500"
-                  }`}>
+                    }`}>
                     {item.type === "video" ? (
                       <VideoIcon className="h-4 w-4" />
                     ) : (
@@ -533,9 +531,8 @@ export default function DashboardPage() {
             return (
               <Card
                 key={config.key}
-                className={`relative overflow-hidden border py-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
-                  isClickable ? "cursor-pointer group" : ""
-                }`}
+                className={`relative overflow-hidden border py-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${isClickable ? "cursor-pointer group" : ""
+                  }`}
                 onClick={() => isClickable && openDialog(config)}
               >
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -581,8 +578,7 @@ export default function DashboardPage() {
 
         {/* ─── charts + activity row ─── */}
         <div className="grid gap-4 lg:grid-cols-7">
-          {/* Bar chart */}
-          <Card className="lg:col-span-4 py-5">
+          {/* <Card className="lg:col-span-4 py-5">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -620,9 +616,9 @@ export default function DashboardPage() {
                 ))}
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
-          {/* Recent activity */}
+          {/* Recent activity
           <Card className="lg:col-span-3 py-5">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -647,7 +643,7 @@ export default function DashboardPage() {
             <CardContent>
               <RecentActivity />
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
 
         {/* ─── models + quick actions row ─── */}
@@ -777,11 +773,10 @@ function RecentActivity() {
       {items.map((item) => (
         <div key={item.id} className="flex items-center gap-3 rounded-lg p-2 -mx-2 transition-colors hover:bg-muted/50">
           <Avatar className="h-9 w-9 shrink-0">
-            <AvatarFallback className={`text-[10px] font-semibold ${
-              item.type === "deduct"
+            <AvatarFallback className={`text-[10px] font-semibold ${item.type === "deduct"
                 ? "bg-gradient-to-br from-red-500/20 to-orange-500/20 text-red-600"
                 : "bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-600"
-            }`}>
+              }`}>
               {item.type === "deduct" ? "−" : "+"}
             </AvatarFallback>
           </Avatar>
