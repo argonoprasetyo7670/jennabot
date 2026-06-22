@@ -91,6 +91,7 @@ const navItems: NavItem[] = [
       { title: "Product Studio", url: "/dashboard/product-studio" },
       { title: "Model Studio", url: "/dashboard/model-studio" },
       { title: "Thumbnail Generator", url: "/dashboard/thumbnail" },
+      { title: "QR Code Generator", url: "/dashboard/tools/qr-generator" },
       // { title: "Prompt Generator", url: "/dashboard/tools/prompt-generator" },
     ],
   },
