@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
 
   // Validate promo code if provided
   if (promoCode) {
+    const promoCodeUpper = promoCode.toUpperCase()
     const promo = await prisma.promo_codes.findUnique({
-      where: { code: promoCode.toUpperCase() },
+      where: { code: promoCodeUpper },
     })
 
     if (promo && promo.isActive) {
@@ -70,6 +71,25 @@ export async function POST(req: NextRequest) {
         if (discountAmount > plan.price) discountAmount = plan.price
         finalPrice = plan.price - discountAmount
         appliedPromo = promo.code
+      }
+    } else {
+      // Cek apakah ini transaksi pertama user (belum pernah sukses)
+      const successfulTransactionsCount = await prisma.transactions.count({
+        where: {
+          userId: session.user.id,
+          status: { in: ["success", "settlement"] }
+        }
+      })
+      const isFirstTime = successfulTransactionsCount === 0;
+
+      const referrer = await prisma.users.findUnique({
+        where: { referralCode: promoCodeUpper }
+      })
+
+      if (referrer && referrer.id !== session.user.id && isFirstTime) {
+        discountAmount = Math.floor((plan.price * 10) / 100)
+        finalPrice = plan.price - discountAmount
+        appliedPromo = referrer.referralCode
       }
     }
   }
