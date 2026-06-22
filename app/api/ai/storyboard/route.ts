@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import { deductCredits, CREDIT_COST_STORYBOARD } from "@/lib/credit-guard"
+import { guardAccess, CREDIT_COST_STORYBOARD } from "@/lib/credit-guard"
 import { prisma } from "@/lib/prisma"
 
 export async function POST(req: NextRequest) {
@@ -22,13 +22,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nama produk dan deskripsi wajib diisi" }, { status: 400 })
     }
 
-    // Check credits
-    const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
-    const currentBalance = credits?.balance ?? 0
+    // ── Subscription / Credit guard ──
+    const accessResult = await guardAccess(
+      session.user.id,
+      CREDIT_COST_STORYBOARD,
+      "storyboard-generator",
+      "Generate Storyboard JSON"
+    )
 
-    if (currentBalance < CREDIT_COST_STORYBOARD) {
+    if (!accessResult.ok) {
       return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_STORYBOARD}, saldo: ${currentBalance}` },
+        { error: accessResult.reason },
         { status: 402 }
       )
     }
@@ -104,13 +108,10 @@ Jumlah Scene: ${scenesCount}
       return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 })
     }
 
-    // Deduct credits only after successful generation
-    await deductCredits(session.user.id, CREDIT_COST_STORYBOARD, "storyboard-generator", "Generate Storyboard JSON")
-
     return NextResponse.json({
       success: true,
       data: parsedResult,
-      creditsDeducted: CREDIT_COST_STORYBOARD
+      creditsDeducted: accessResult.method === "credits" ? CREDIT_COST_STORYBOARD : 0,
     })
 
   } catch (error: any) {

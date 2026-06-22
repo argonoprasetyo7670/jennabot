@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { useGenerationQueue, type GenerationJob } from "@/contexts/generation-queue"
 import { useCredits } from "@/contexts/credits"
+import { useSubscription } from "@/contexts/subscription"
 import { cn, formatModelName } from "@/lib/utils"
 import { downloadVideo, downloadImage } from "@/lib/download"
 import { VideoIcon } from "lucide-react"
@@ -37,6 +38,7 @@ export function HeaderActions() {
 
   const { jobs, activeCount, clearJob, clearCompleted } = useGenerationQueue()
   const { balance, loading: creditsLoading } = useCredits()
+  const { subscription, isSubscribed } = useSubscription()
 
   React.useEffect(() => {
     setIsDark(!document.documentElement.classList.contains("light"))
@@ -95,6 +97,20 @@ export function HeaderActions() {
 
   return (
     <div className="flex items-center gap-1">
+      {/* Subscription badge */}
+      {isSubscribed && subscription && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={() => router.push("/dashboard/subscription")}
+        >
+          <span className="flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-500/20 to-purple-500/20 border border-violet-500/30 px-2 py-0.5 text-[10px] font-bold text-violet-400">
+            👑 {subscription.plan}
+          </span>
+        </Button>
+      )}
+
       <Button
         variant="ghost"
         size="sm"

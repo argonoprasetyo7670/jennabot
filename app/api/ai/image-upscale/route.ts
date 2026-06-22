@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import { CREDIT_COST_UPSCALE, deductCredits, refundCredits } from "@/lib/credit-guard"
+import { CREDIT_COST_UPSCALE, guardAccess, refundCredits } from "@/lib/credit-guard"
 
 /**
  * POST /api/ai/image-upscale
@@ -31,20 +31,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "USEAPI_TOKEN not configured" }, { status: 500 })
     }
 
-    // ── Credit check & pre-deduct ──
-    const deductResult = await deductCredits(
+    // ── Subscription / Credit guard ──
+    const accessResult = await guardAccess(
       session.user.id,
       CREDIT_COST_UPSCALE,
       "image-upscale",
       `Upscale gambar ke ${resolution}`
     )
 
-    if (!deductResult.ok) {
+    if (!accessResult.ok) {
       return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_UPSCALE}, saldo: ${deductResult.balance}` },
+        { error: accessResult.reason },
         { status: 402 }
       )
     }
+
+    const shouldRefundOnError = accessResult.method === "credits"
 
     const res = await fetch("https://api.useapi.net/v1/google-flow/images/upscale", {
       method: "POST",
@@ -58,8 +60,8 @@ export async function POST(request: NextRequest) {
     const data = await res.json()
 
     if (!res.ok) {
-      // ── Refund on failure ──
-      await refundCredits(session.user.id, CREDIT_COST_UPSCALE, "image-upscale")
+      // ── Refund on failure (only if credits were deducted) ──
+      if (shouldRefundOnError) await refundCredits(session.user.id, CREDIT_COST_UPSCALE, "image-upscale")
       const errorMsg = typeof data.error === "string"
         ? data.error
         : data.error?.message || `Upscale failed (${res.status})`
@@ -67,15 +69,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!data.encodedImage) {
-      // ── Refund — no image returned ──
-      await refundCredits(session.user.id, CREDIT_COST_UPSCALE, "image-upscale")
+      // ── Refund — no image returned (only if credits were deducted) ──
+      if (shouldRefundOnError) await refundCredits(session.user.id, CREDIT_COST_UPSCALE, "image-upscale")
       return NextResponse.json({ error: "No upscaled image returned" }, { status: 500 })
     }
 
     return NextResponse.json({
       encodedImage: data.encodedImage,
-      creditsDeducted: CREDIT_COST_UPSCALE,
-      remainingBalance: deductResult.balance,
+      creditsDeducted: accessResult.method === "credits" ? CREDIT_COST_UPSCALE : 0,
+      remainingBalance: accessResult.balance,
     })
   } catch (err) {
     console.error("[image-upscale] Error:", err)

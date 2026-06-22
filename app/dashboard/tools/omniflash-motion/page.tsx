@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import {
   SendIcon,
-  PlusIcon,
   Loader2Icon,
   DownloadIcon,
   XIcon,
@@ -60,16 +59,16 @@ export default function OmniflashMotionPage() {
   const [showGalleryPicker, setShowGalleryPicker] = useState<"image" | "video" | null>(null)
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([])
   const [galleryLoading, setGalleryLoading] = useState(false)
-  
+
   const [prompt, setPrompt] = useState("")
   const [previewVideo, setPreviewVideo] = useState<GeneratedVideo | null>(null)
-  
+
   const [imageRef, setImageRef] = useState<MediaReference | null>(null)
   const [videoRef, setVideoRef] = useState<MediaReference | null>(null)
-  
+
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set())
-  
+
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -94,7 +93,7 @@ export default function OmniflashMotionPage() {
     if (!imageRef || !videoRef || isGenerating) return
 
     const userPrompt = prompt.trim()
-    const instruction = "buat agar model pada gambar kedua mengikuti gerakan dan copy musik dari referensi video dan buang semua watermark yang ada"
+    const instruction = "Make the person in @referenceImage_1 perform the exact same movements, poses, and choreography from the reference video. Preserve the person's face and appearance. Match the timing and rhythm of the original video. Generate natural ambient audio."
     const finalPrompt = userPrompt ? `${userPrompt} ${instruction}` : instruction
 
     const jobId = submitVideoJob(
@@ -232,67 +231,67 @@ export default function OmniflashMotionPage() {
             {generatedVideos.map((vid, i) => {
               const expired = isMediaExpired((vid as any).rawUrl, vid.url)
               return (
-              <div key={i} className="overflow-hidden rounded-2xl border border-border bg-muted/30 animate-fade-up">
-                <div className="relative aspect-video cursor-pointer" onClick={() => !expired && setPreviewVideo(vid)}>
-                  {expired ? (
-                    <div className="flex h-full w-full flex-col items-center justify-center bg-muted/50 p-4 text-center">
-                      <VideoIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
-                      <p className="text-sm font-medium text-foreground/70">Kedaluwarsa</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-snug max-w-[200px] mx-auto">Link berlaku 24 jam. Jika sudah tersimpan, lihat di Gallery.</p>
+                <div key={i} className="overflow-hidden rounded-2xl border border-border bg-muted/30 animate-fade-up">
+                  <div className="relative aspect-video cursor-pointer" onClick={() => !expired && setPreviewVideo(vid)}>
+                    {expired ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center bg-muted/50 p-4 text-center">
+                        <VideoIcon className="mb-2 h-8 w-8 text-muted-foreground/30" />
+                        <p className="text-sm font-medium text-foreground/70">Kedaluwarsa</p>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-snug max-w-[200px] mx-auto">Link berlaku 24 jam. Jika sudah tersimpan, lihat di Gallery.</p>
+                      </div>
+                    ) : (
+                      <video
+                        src={vid.url}
+                        className="w-full h-full object-contain bg-background"
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border px-3 py-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      Video Motion Generated
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => !expired && setPreviewVideo(vid)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Preview">
+                        <EyeIcon className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Preview</span>
+                      </button>
+                      <button onClick={() => !expired && handleDownload(vid.url, "omniflash-motion.mp4")} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Download">
+                        <DownloadIcon className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Download</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (savedVideos.has(vid.url) || expired) return
+                          try {
+                            const res = await fetch("/api/gallery/save", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                url: vid.url,
+                                type: "video",
+                                prompt: activeJob?.prompt || "",
+                                model: activeJob?.model || "omni-flash",
+                                aspectRatio: vid.aspectRatio || "portrait",
+                                mediaGenerationId: vid.mediaGenerationId || "",
+                                sourceAction: "omniflash-motion",
+                              }),
+                            })
+                            if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
+                          } catch { /* ignore */ }
+                        }}
+                        disabled={savedVideos.has(vid.url) || expired}
+                        className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted", savedVideos.has(vid.url) ? "text-emerald-500" : expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        <ImagePlusIcon className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">{savedVideos.has(vid.url) ? "Tersimpan ✓" : "Gallery"}</span>
+                      </button>
                     </div>
-                  ) : (
-                    <video
-                      src={vid.url}
-                      className="w-full h-full object-contain bg-background"
-                      muted
-                      loop
-                      autoPlay
-                      playsInline
-                    />
-                  )}
-                </div>
-                <div className="flex items-center justify-between border-t border-border px-3 py-2">
-                  <span className="text-[10px] text-muted-foreground">
-                    Video Motion Generated
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => !expired && setPreviewVideo(vid)} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Preview">
-                      <EyeIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Preview</span>
-                    </button>
-                    <button onClick={() => !expired && handleDownload(vid.url, "omniflash-motion.mp4")} disabled={expired} className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition", expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:bg-muted hover:text-foreground")} title="Download">
-                      <DownloadIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Download</span>
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (savedVideos.has(vid.url) || expired) return
-                        try {
-                          const res = await fetch("/api/gallery/save", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              url: vid.url,
-                              type: "video",
-                              prompt: activeJob?.prompt || "",
-                              model: activeJob?.model || "omni-flash",
-                              aspectRatio: vid.aspectRatio || "portrait",
-                              mediaGenerationId: vid.mediaGenerationId || "",
-                              sourceAction: "omniflash-motion",
-                            }),
-                          })
-                          if (res.ok) setSavedVideos(prev => new Set(prev).add(vid.url))
-                        } catch { /* ignore */ }
-                      }}
-                      disabled={savedVideos.has(vid.url) || expired}
-                      className={cn("flex h-7 items-center gap-1 rounded-md px-2 text-[11px] transition hover:bg-muted", savedVideos.has(vid.url) ? "text-emerald-500" : expired ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground")}
-                    >
-                      <ImagePlusIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{savedVideos.has(vid.url) ? "Tersimpan ✓" : "Gallery"}</span>
-                    </button>
                   </div>
                 </div>
-              </div>
               )
             })}
           </div>
@@ -320,7 +319,7 @@ export default function OmniflashMotionPage() {
         <div className="mx-auto max-w-3xl px-4 pb-4">
           <div className="mb-2">
             <div className="flex justify-center gap-4 px-1 pb-2">
-              
+
               {/* Image Reference */}
               <div className="flex flex-col items-center gap-1.5">
                 <span className="text-[10px] font-medium text-muted-foreground">Gambar Referensi</span>
@@ -398,13 +397,13 @@ export default function OmniflashMotionPage() {
             />
 
             <div className="mb-1 flex shrink-0 items-center gap-1.5">
-              <button 
-                onClick={handleGenerate} 
-                disabled={!imageRef || !videoRef || isGenerating} 
+              <button
+                onClick={handleGenerate}
+                disabled={!imageRef || !videoRef || isGenerating}
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-xl transition-all", 
-                  imageRef && videoRef && !isGenerating 
-                    ? "bg-gradient-to-r from-violet-500 to-blue-500 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40" 
+                  "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                  imageRef && videoRef && !isGenerating
+                    ? "bg-gradient-to-r from-violet-500 to-blue-500 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
                     : "bg-muted text-muted-foreground/40 cursor-not-allowed"
                 )}
                 title={!imageRef || !videoRef ? "Upload gambar dan video referensi terlebih dahulu" : undefined}
@@ -413,7 +412,7 @@ export default function OmniflashMotionPage() {
               </button>
             </div>
           </div>
-          
+
           <div className="mt-2 text-center">
             <p className="text-[9px] text-muted-foreground opacity-60">Sistem otomatis menyisipkan prompt untuk mengikuti gerakan video dan menghapus watermark.</p>
           </div>

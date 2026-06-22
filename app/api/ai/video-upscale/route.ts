@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { deductCredits, refundCredits } from "@/lib/credit-guard"
+import { guardAccess, refundCredits } from "@/lib/credit-guard"
 
 const USEAPI_BASE = "https://api.useapi.net/v1/google-flow"
 const CREDIT_COST_4K = 50
@@ -28,24 +28,25 @@ export async function POST(req: NextRequest) {
     const is4K = resolution === "4K"
     const requiredCredits = is4K ? CREDIT_COST_4K : 0
 
-    if (requiredCredits > 0) {
-      const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
-      const currentBalance = credits?.balance ?? 0
+    let shouldRefundOnError = false
 
-      // Deduct credits beforehand
-      const deductResult = await deductCredits(
+    if (requiredCredits > 0) {
+      // ── Subscription / Credit guard ──
+      const accessResult = await guardAccess(
         session.user.id,
         requiredCredits,
         "video-upscale",
         `Upscale video ke ${resolution}`
       )
 
-      if (!deductResult.ok) {
+      if (!accessResult.ok) {
         return NextResponse.json(
-          { error: `Kredit tidak cukup. Butuh ${requiredCredits}, saldo: ${deductResult.balance}` },
+          { error: accessResult.reason },
           { status: 402 }
         )
       }
+
+      shouldRefundOnError = accessResult.method === "credits"
     }
 
     const payload = {
@@ -66,8 +67,8 @@ export async function POST(req: NextRequest) {
     const data = await response.json()
 
     if (!response.ok) {
-      // Refund credits on failure
-      if (requiredCredits > 0) {
+      // Refund credits on failure (only if credits were deducted)
+      if (requiredCredits > 0 && shouldRefundOnError) {
         await refundCredits(session.user.id, requiredCredits, "video-upscale")
       }
       return NextResponse.json({ error: data.error || `API error: ${response.status}` }, { status: response.status })
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!videoUrl) {
-      if (requiredCredits > 0) {
+      if (requiredCredits > 0 && shouldRefundOnError) {
         await refundCredits(session.user.id, requiredCredits, "video-upscale")
       }
       return NextResponse.json({ error: "Video URL not found in upscale response" }, { status: 500 })

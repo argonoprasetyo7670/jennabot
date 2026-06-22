@@ -8,7 +8,7 @@ import {
   ImageIcon, Trash2Icon, Loader2Icon, CheckCircle2Icon,
   SearchIcon, XIcon, GridIcon, LayoutGridIcon, VideoIcon,
   ClockIcon, FilterIcon, CalendarIcon, UserIcon, ChevronLeftIcon, ChevronRightIcon, SparklesIcon,
-  ArrowDownUpIcon
+  ArrowDownUpIcon, TimerIcon
 } from "lucide-react"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -41,6 +41,10 @@ export function AdminGalleryTab() {
   const [isCleaning, setIsCleaning] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  // Cleanup expired (> 7 days)
+  const [isCleaningExpired, setIsCleaningExpired] = useState(false)
+  const [confirmExpiredOpen, setConfirmExpiredOpen] = useState(false)
 
   // Gallery Viewer States
   const [items, setItems] = useState<AdminGalleryItem[]>([])
@@ -85,6 +89,26 @@ export function AdminGalleryTab() {
       setResult({ success: false, message: "Terjadi kesalahan koneksi" })
     } finally {
       setIsCleaning(false)
+    }
+  }
+
+  const handleCleanupExpired = async () => {
+    setIsCleaningExpired(true)
+    setResult(null)
+    try {
+      const res = await fetch("/api/admin/gallery/cleanup-expired", { method: "DELETE" })
+      const data = await res.json()
+      if (res.ok) {
+        setResult({ success: true, message: data.message })
+        setConfirmExpiredOpen(false)
+        fetchItems()
+      } else {
+        setResult({ success: false, message: data.error || "Gagal membersihkan gallery" })
+      }
+    } catch (err) {
+      setResult({ success: false, message: "Terjadi kesalahan koneksi" })
+    } finally {
+      setIsCleaningExpired(false)
     }
   }
 
@@ -203,6 +227,28 @@ export function AdminGalleryTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Cleanup > 7 days */}
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="mb-1 text-sm font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <TimerIcon className="h-4 w-4" />
+                Hapus Gallery {'>'} 7 Hari
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Menghapus item gallery yang <strong>lebih dari 7 hari</strong> dari database dan MinIO. Tindakan ini tidak dapat dibatalkan.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmExpiredOpen(true)}
+              className="gap-2 shrink-0 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+            >
+              <TimerIcon className="h-4 w-4" />
+              Hapus Item Lama
+            </Button>
+          </div>
+
+          {/* Full cleanup */}
           <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h3 className="mb-1 text-sm font-semibold text-red-600 dark:text-red-400">
@@ -521,6 +567,35 @@ export function AdminGalleryTab() {
             <Button variant="destructive" onClick={handleCleanup} disabled={isCleaning} className="gap-2">
               {isCleaning ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Trash2Icon className="h-4 w-4" />}
               {isCleaning ? "Membersihkan..." : "Ya, Hapus Semua"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Cleanup Expired Dialog */}
+      <Dialog open={confirmExpiredOpen} onOpenChange={setConfirmExpiredOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TimerIcon className="h-5 w-5 text-amber-500" />
+              Hapus Gallery Lebih dari 7 Hari
+            </DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus semua item gallery yang <strong>dibuat lebih dari 7 hari yang lalu</strong>? File akan dihapus dari database dan MinIO storage secara permanen. Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setConfirmExpiredOpen(false)} disabled={isCleaningExpired}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCleanupExpired}
+              disabled={isCleaningExpired}
+              className="gap-2 bg-amber-600 hover:bg-amber-700"
+            >
+              {isCleaningExpired ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <TimerIcon className="h-4 w-4" />}
+              {isCleaningExpired ? "Menghapus..." : "Ya, Hapus Item Lama"}
             </Button>
           </DialogFooter>
         </DialogContent>

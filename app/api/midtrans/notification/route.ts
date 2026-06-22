@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
+import { activateSubscription } from "@/app/api/subscription/purchase/route"
 
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_PRODUCTION_SERVER_KEY || process.env.MIDTRANS_SERVER_KEY || ""
 
@@ -107,9 +108,15 @@ export async function POST(req: NextRequest) {
       `[midtrans] Order ${order_id}: ${transaction_status} → ${newStatus} (payment: ${payment_type})`
     )
 
-    // On successful payment → add credits
+    // On successful payment → handle based on order type
     if (newStatus === "success" && transaction.status !== "success") {
-      await addCreditsFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode)
+      if (order_id.startsWith("SUB-")) {
+        // ── Subscription purchase ──
+        await activateSubscriptionFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode)
+      } else {
+        // ── Credit purchase ──
+        await addCreditsFromPurchase(transaction.userId, transaction.plan, transaction.orderId, transaction.promoCode)
+      }
     }
 
     return NextResponse.json({ status: "ok" })
@@ -181,5 +188,41 @@ async function addCreditsFromPurchase(userId: string, plan: string, orderId: str
 
   console.log(
     `[credits] Added ${creditsToAdd} credits for user ${userId}. Balance: ${currentBalance} → ${newBalance}`
+  )
+}
+
+/**
+ * Activate subscription from a successful Midtrans payment.
+ * Plan format: "Langganan Pro - 14 Hari"
+ */
+async function activateSubscriptionFromPurchase(userId: string, plan: string, orderId: string, promoCode: string | null) {
+  // Parse plan name from transaction plan string
+  const nameMatch = plan.match(/Langganan\s+(\w+)/i)
+  const planName = nameMatch ? nameMatch[1] : "Unknown"
+
+  // Find the plan in DB
+  const dbPlan = await prisma.subscription_plans.findFirst({
+    where: { name: planName, isActive: true },
+  })
+
+  if (!dbPlan) {
+    console.error(`[subscription] Plan not found for: ${plan} (parsed: ${planName})`)
+    return
+  }
+
+  await activateSubscription(userId, dbPlan.id, dbPlan.name, dbPlan.duration, dbPlan.price)
+
+  // Increment promo usage if applicable
+  if (promoCode) {
+    await prisma.promo_codes.update({
+      where: { code: promoCode },
+      data: { currentUses: { increment: 1 } },
+    }).catch(() => {
+      console.warn(`[subscription] Failed to increment promo usage: ${promoCode}`)
+    })
+  }
+
+  console.log(
+    `[subscription] Activated ${dbPlan.name} (${dbPlan.duration} days) for user ${userId} via order ${orderId}`
   )
 }

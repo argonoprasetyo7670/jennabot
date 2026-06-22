@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import { CREDIT_COST_TTS, deductCredits, refundCredits } from "@/lib/credit-guard"
+import { CREDIT_COST_TTS, guardAccess, refundCredits } from "@/lib/credit-guard"
 import { ttsGenerate } from "@/lib/api/elevenlabs"
 
 /**
@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  let shouldRefundOnError = false
 
   try {
     const body = await req.json()
@@ -34,20 +36,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // ── Credit deduction ──
-    const deductResult = await deductCredits(
+    // ── Subscription / Credit guard ──
+    const accessResult = await guardAccess(
       session.user.id,
       CREDIT_COST_TTS,
       "text-to-speech",
       `TTS: ${text.slice(0, 50)}${text.length > 50 ? "..." : ""}`
     )
 
-    if (!deductResult.ok) {
+    if (!accessResult.ok) {
       return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_TTS}, saldo: ${deductResult.balance}` },
+        { error: accessResult.reason },
         { status: 402 }
       )
     }
+    shouldRefundOnError = accessResult.method === "credits"
 
     // ── Generate speech ──
     const audioBuffer = await ttsGenerate({
@@ -62,18 +65,20 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "audio/mpeg",
         "Content-Disposition": `attachment; filename="tts-${Date.now()}.mp3"`,
-        "X-Credits-Deducted": String(CREDIT_COST_TTS),
-        "X-Credits-Balance": String(deductResult.balance),
+        "X-Credits-Deducted": String(accessResult.method === "credits" ? CREDIT_COST_TTS : 0),
+        "X-Credits-Balance": String(accessResult.balance),
       },
     })
   } catch (error) {
     console.error("[tts] Error:", error)
 
-    // Attempt refund
+    // Attempt refund (only if credits were deducted)
     try {
-      const session2 = await auth()
-      if (session2?.user?.id) {
-        await refundCredits(session2.user.id, CREDIT_COST_TTS, "text-to-speech")
+      if (shouldRefundOnError) {
+        const session2 = await auth()
+        if (session2?.user?.id) {
+          await refundCredits(session2.user.id, CREDIT_COST_TTS, "text-to-speech")
+        }
       }
     } catch (refundErr) {
       console.error("[tts] Refund error:", refundErr)

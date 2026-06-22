@@ -3,7 +3,7 @@ export const fetchCache = 'force-no-store'
 
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import { CREDIT_COST_IMAGE, deductCredits, refundCredits } from "@/lib/credit-guard"
+import { CREDIT_COST_IMAGE, guardAccess, refundCredits } from "@/lib/credit-guard"
 import { storeImageJobMeta, getImageJobResult, storeImageJobResult } from "@/lib/credits"
 
 const USEAPI_BASE = "https://api.useapi.net/v1/google-flow"
@@ -104,20 +104,22 @@ export async function POST(req: NextRequest) {
     const imageCount = count || 1
     const creditCost = imageCount * CREDIT_COST_IMAGE
     
-    // ── Credit check & pre-deduct ──
-    const deductResult = await deductCredits(
+    // ── Subscription / Credit guard ──
+    const accessResult = await guardAccess(
       session.user.id,
       creditCost,
       "image-generator",
       `Generate ${imageCount} gambar (${model || "imagen-4"})`
     )
 
-    if (!deductResult.ok) {
+    if (!accessResult.ok) {
       return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${creditCost}, saldo: ${deductResult.balance}` },
+        { error: accessResult.reason },
         { status: 402 }
       )
     }
+
+    const shouldRefundOnError = accessResult.method === "credits"
 
     // Build base payload (without captcha)
     const basePayload: Record<string, unknown> = {
@@ -212,34 +214,44 @@ export async function POST(req: NextRequest) {
 
         if (!fallbackResponse.ok) {
           console.error(`[image-generate] Fallback API error ${fallbackResponse.status}:`, fallbackData)
-          // ── Refund on failure ──
-          await refundCredits(session.user.id, creditCost, feature)
+          // ── Refund on failure (only if credits were deducted) ──
+          if (shouldRefundOnError) await refundCredits(session.user.id, creditCost, feature)
+          
+          const errMsg = typeof fallbackData.error === 'string' 
+            ? (fallbackData.response?.error?.message ? `${fallbackData.error}: ${fallbackData.response.error.message}` : fallbackData.error)
+            : (fallbackData.error?.message || fallbackData.error || `API error: ${fallbackResponse.status}`)
+            
           return NextResponse.json(
-            { error: fallbackData.error || `API error: ${fallbackResponse.status}` },
+            { error: errMsg },
             { status: fallbackResponse.status }
           )
         }
 
-        return handlePostResponse(fallbackData, useAsync, session.user.id, creditCost, feature, deductResult.balance)
+        return handlePostResponse(fallbackData, useAsync, session.user.id, creditCost, feature, accessResult.balance)
       }
 
-      // Any other error
       if (!response.ok) {
         console.error(`[image-generate] API error ${response.status}:`, data)
         // ── Refund on failure ──
         await refundCredits(session.user.id, creditCost, feature)
+        
+        // Handle new UseAPI error shape (classification string in data.error, Google's error in data.response.error)
+        const errMsg = typeof data.error === 'string' 
+          ? (data.response?.error?.message ? `${data.error}: ${data.response.error.message}` : data.error)
+          : (data.error?.message || data.error || `API error: ${response.status}`)
+          
         return NextResponse.json(
-          { error: data.error || `API error: ${response.status}` },
+          { error: errMsg },
           { status: response.status }
         )
       }
 
       // Success
-      return handlePostResponse(data, useAsync, session.user.id, creditCost, feature, deductResult.balance)
+      return handlePostResponse(data, useAsync, session.user.id, creditCost, feature, accessResult.balance)
     }
 
     // Should never reach here, but refund just in case
-    await refundCredits(session.user.id, creditCost, feature)
+    if (shouldRefundOnError) await refundCredits(session.user.id, creditCost, feature)
     return NextResponse.json({ error: "Unexpected error in retry loop" }, { status: 500 })
   } catch (error) {
     console.error("Image generation error:", error)

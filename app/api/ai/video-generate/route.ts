@@ -4,14 +4,47 @@ import { prisma } from "@/lib/prisma"
 import {
   deductCredits,
   storeVideoJobMeta,
+  getVideoJobMeta,
   storeVideoJobResult,
   getVideoJobResult,
 } from "@/lib/credits"
+import { checkSubscription } from "@/lib/credit-guard"
 
 const USEAPI_BASE = "https://api.useapi.net/v1/google-flow"
 const CAPTCHA_BROKER_URL = process.env.CAPTCHA_BROKER_URL || "http://localhost:4000"
 const CAPTCHA_BROKER_KEY = process.env.CAPTCHA_BROKER_KEY || "sk-admin-change-me"
 const MAX_CAPTCHA_RETRIES = 3
+
+/**
+ * V2V moderation auto-retry.
+ * Google's content-safety moderation is non-deterministic — the exact same body
+ * can hit IDENTIFIABLE_PERSON_SAFETY, CHILD_SAFETY, etc. on one attempt and
+ * succeed cleanly on the next. A simple resubmit usually clears it.
+ */
+const MAX_MODERATION_RETRIES = 3
+const MODERATION_PATTERNS = [
+  "IDENTIFIABLE_PERSON_SAFETY",
+  "CHILD_SAFETY",
+  "CONTENT_SAFETY",
+  "SAFETY_FILTER",
+  "MODERATION",
+  "IMAGE_GENERATION_SAFETY",
+  "SAFETY",
+]
+
+/** Check if an error string matches a known moderation/content-safety pattern */
+function isModerationError(error: string | undefined | null): boolean {
+  if (!error) return false
+  const upper = error.toUpperCase()
+  return MODERATION_PATTERNS.some((p) => upper.includes(p))
+}
+
+/**
+ * Track moderation retry attempts per original jobId.
+ * Maps original jobId → { attempts, currentJobId, requestBody }
+ * Cleaned up after 30 minutes alongside deductedJobs.
+ */
+const moderationRetries = new Map<string, { attempts: number; currentJobId: string; ts: number }>()
 
 /** Credit cost per video — MUST match CREDIT_COST_VIDEO in generation-queue.tsx */
 const CREDIT_COST_VIDEO = 5
@@ -26,6 +59,9 @@ setInterval(() => {
   const cutoff = Date.now() - 30 * 60_000
   for (const [id, ts] of deductedJobs) {
     if (ts < cutoff) deductedJobs.delete(id)
+  }
+  for (const [id, entry] of moderationRetries) {
+    if (entry.ts < cutoff) moderationRetries.delete(id)
   }
 }, 5 * 60_000)
 
@@ -150,19 +186,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 })
     }
 
-    // Check credit balance
+    // Check subscription first, then credit balance
     const videoCount = count || 1
     const modelToUse = model || "veo-3.1-lite-low-priority"
     const costPerVideo = modelToUse === "omni-flash" ? 50 : CREDIT_COST_VIDEO
     const requiredCredits = videoCount * costPerVideo
-    const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
-    const currentBalance = credits?.balance ?? 0
 
-    if (currentBalance < requiredCredits) {
-      return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${requiredCredits}, saldo: ${currentBalance}` },
-        { status: 402 }
-      )
+    const activeSub = await checkSubscription(session.user.id)
+
+    if (!activeSub) {
+      // No subscription — check credit balance
+      const credits = await prisma.user_credits.findUnique({ where: { userId: session.user.id } })
+      const currentBalance = credits?.balance ?? 0
+
+      if (currentBalance < requiredCredits) {
+        return NextResponse.json(
+          { error: `Kredit tidak cukup. Butuh ${requiredCredits}, saldo: ${currentBalance}. Berlangganan untuk akses unlimited.` },
+          { status: 402 }
+        )
+      }
     }
 
     // Build payload
@@ -172,7 +214,11 @@ export async function POST(req: NextRequest) {
       aspectRatio: aspectRatio || "landscape",
       duration: duration || 8,
       count: videoCount,
+      captchaRetry: 5,
     }
+
+    // Feature for credit cost identification
+    const feat = feature || "video-generator"
 
     if (useAsync) basePayload.async = true
     if (seed !== undefined && seed !== null) basePayload.seed = seed
@@ -212,7 +258,6 @@ export async function POST(req: NextRequest) {
     }
 
     const mode = startImage ? "I2V" : referenceImages?.length ? "R2V" : "T2V"
-    const feat = feature || "video-generator"
 
     // Try with captcha, retry on 403
     for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
@@ -256,15 +301,24 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: fallbackData.error || `API error: ${fallbackRes.status}` }, { status: fallbackRes.status })
         }
 
-        return handlePostResponse(fallbackData, useAsync, session.user.id, videoCount, feat)
+        return handlePostResponse(fallbackData, useAsync, session.user.id, videoCount, feat, basePayload)
       }
 
       if (!response.ok) {
+        const errMsg = (data.error as string) || `API error: ${response.status}`
+        
+        // V2V moderation auto-retry (sync mode): resubmit the same body
+        if (isModerationError(errMsg) && attempt < MAX_CAPTCHA_RETRIES) {
+          console.warn(`[video-generate] Moderation error on attempt ${attempt}, retrying: ${errMsg}`)
+          await new Promise((r) => setTimeout(r, 1000 + Math.random() * 2000)) // 1-3s jitter
+          continue
+        }
+
         console.error(`[video-generate] API error ${response.status}:`, JSON.stringify(data))
-        return NextResponse.json({ error: data.error || `API error: ${response.status}` }, { status: response.status })
+        return NextResponse.json({ error: errMsg }, { status: response.status })
       }
 
-      return handlePostResponse(data, useAsync, session.user.id, videoCount, feat)
+      return handlePostResponse(data, useAsync, session.user.id, videoCount, feat, basePayload)
     }
 
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 })
@@ -282,23 +336,32 @@ async function handlePostResponse(
   useAsync: boolean,
   userId: string,
   videoCount: number,
-  feature: string
+  feature: string,
+  requestBody?: Record<string, unknown>
 ) {
   const useapiJobId = (data.jobid || data.jobId) as string | undefined
 
   if (useAsync) {
-    // Async mode: store job metadata so the callback/GET can deduct credits
+    // Async mode: store job metadata (including requestBody for moderation retry)
     if (useapiJobId) {
-      await storeVideoJobMeta(useapiJobId, { userId, videoCount, feature })
+      await storeVideoJobMeta(useapiJobId, { userId, videoCount, feature, requestBody })
     }
     console.log(`[video-generate] Async job started: ${useapiJobId}`)
     return NextResponse.json({ jobId: useapiJobId, status: "processing" })
   } else {
-    // Sync mode: UseAPI returned the full result. Deduct credits and return.
+    // Sync mode: UseAPI returned the full result. Deduct credits (only if no subscription) and return.
     const media = extractMedia(data)
     console.log(`[video-generate] Sync job done: ${useapiJobId}, videos=${media.length}`)
     const costPerVideo = feature === "omni-flash" ? 50 : CREDIT_COST_VIDEO
-    const deducted = await deductCredits(userId, videoCount * costPerVideo, feature)
+    
+    // Check subscription — skip credit deduction for subscribers
+    const activeSub = await checkSubscription(userId)
+    let deducted = 0
+    if (!activeSub) {
+      deducted = await deductCredits(userId, videoCount * costPerVideo, feature)
+    } else {
+      console.log(`[video-generate] Subscriber — skipping credit deduction for ${feature}`)
+    }
     return NextResponse.json({ jobId: useapiJobId || "", status: "done", media, creditsDeducted: deducted })
   }
 }
@@ -369,8 +432,95 @@ export async function GET(req: NextRequest) {
     }
 
     if (useapiStatus === "failed") {
+      const failError = (data.error as string) || "Video generation failed"
+
+      // ── V2V moderation auto-retry (async mode) ──
+      // Google's content-safety is non-deterministic — resubmit clears it.
+      if (isModerationError(failError)) {
+        // Determine how many retries we've already done for this job chain
+        let retryEntry = moderationRetries.get(useapiJobId)
+        if (!retryEntry) {
+          // First retry for this job — check all existing entries to see if
+          // this jobId is a child of a previous retry chain
+          for (const [origId, entry] of moderationRetries) {
+            if (entry.currentJobId === useapiJobId) {
+              retryEntry = entry
+              break
+            }
+          }
+        }
+
+        const attempts = retryEntry ? retryEntry.attempts : 0
+
+        if (attempts < MAX_MODERATION_RETRIES) {
+          // Retrieve original request body from job metadata
+          const meta = await getVideoJobMeta(useapiJobId)
+          const requestBody = meta?.requestBody
+
+          if (requestBody) {
+            console.warn(`[video-generate] Moderation error on async job ${useapiJobId} (attempt ${attempts + 1}/${MAX_MODERATION_RETRIES}), resubmitting: ${failError}`)
+
+            try {
+              // Get a fresh captcha token for the retry
+              const captchaToken = await getCaptchaToken()
+              const retryPayload = { ...requestBody }
+              if (captchaToken) retryPayload.captchaToken = captchaToken
+
+              const retryRes = await fetch(`${USEAPI_BASE}/videos`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${apiToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(retryPayload),
+              })
+              const retryData = await retryRes.json()
+
+              if (retryRes.ok) {
+                const newJobId = (retryData.jobid || retryData.jobId) as string
+                if (newJobId) {
+                  // Store metadata for the new job (same user, same cost)
+                  await storeVideoJobMeta(newJobId, {
+                    userId: meta.userId,
+                    videoCount: meta.videoCount,
+                    feature: meta.feature,
+                    requestBody,
+                  })
+
+                  // Track retry chain
+                  moderationRetries.set(useapiJobId, {
+                    attempts: attempts + 1,
+                    currentJobId: newJobId,
+                    ts: Date.now(),
+                  })
+
+                  console.log(`[video-generate] Moderation retry submitted: ${useapiJobId} → ${newJobId} (attempt ${attempts + 1})`)
+
+                  // Return retrying status with new jobId — client will switch polling
+                  return NextResponse.json({
+                    jobId: useapiJobId,
+                    status: "retrying",
+                    newJobId,
+                    retryAttempt: attempts + 1,
+                    retryReason: failError,
+                  })
+                }
+              } else {
+                console.warn(`[video-generate] Moderation retry POST failed: ${retryRes.status}`, retryData)
+              }
+            } catch (retryErr) {
+              console.error(`[video-generate] Moderation retry error:`, retryErr)
+            }
+          } else {
+            console.warn(`[video-generate] Moderation error but no requestBody stored for job ${useapiJobId}`)
+          }
+        } else {
+          console.warn(`[video-generate] Moderation retries exhausted (${MAX_MODERATION_RETRIES}) for job chain starting at ${useapiJobId}`)
+        }
+      }
+
       return NextResponse.json(
-        { jobId: useapiJobId, status: "error", error: (data.error as string) || "Video generation failed" },
+        { jobId: useapiJobId, status: "error", error: failError },
         { status: 500 }
       )
     }
@@ -378,14 +528,19 @@ export async function GET(req: NextRequest) {
     if (useapiStatus === "completed") {
       const media = extractMedia(data)
 
-      // Deduct credits (only once per job)
+      // Deduct credits (only once per job, only for non-subscribers)
       let creditsDeducted = 0
       const deductKey = `deducted:${useapiJobId}`
       if (!deductedJobs.has(deductKey)) {
-        const videoCount = media.length || 1
-        const feat = (data.request as Record<string, unknown>)?.model as string || "video-generator"
-        const costPerVideo = feat === "omni-flash" ? 50 : CREDIT_COST_VIDEO
-        creditsDeducted = await deductCredits(session.user.id, videoCount * costPerVideo, `video-${feat}`)
+        const activeSub = await checkSubscription(session.user.id)
+        if (!activeSub) {
+          const videoCount = media.length || 1
+          const feat = (data.request as Record<string, unknown>)?.model as string || "video-generator"
+          const costPerVideo = feat === "omni-flash" ? 50 : CREDIT_COST_VIDEO
+          creditsDeducted = await deductCredits(session.user.id, videoCount * costPerVideo, `video-${feat}`)
+        } else {
+          console.log(`[video-generate] Subscriber — skipping credit deduction for job ${useapiJobId}`)
+        }
         deductedJobs.set(deductKey, Date.now())
       }
 

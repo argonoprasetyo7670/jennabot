@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { readFileSync } from "fs"
 import { join } from "path"
-import { CREDIT_COST_CHAT, deductCredits, refundCredits } from "@/lib/credit-guard"
+import { CREDIT_COST_CHAT, guardAccess, refundCredits } from "@/lib/credit-guard"
 
 // Load system prompt from .md file (cached at module level)
 const SYSTEM_PROMPT = readFileSync(
@@ -22,20 +22,22 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // ── Credit check & pre-deduct ──
-    const deductResult = await deductCredits(
+    // ── Subscription / Credit guard ──
+    const accessResult = await guardAccess(
       session.user.id,
       CREDIT_COST_CHAT,
       "workflow-agent",
       "Workflow Agent chat request"
     )
 
-    if (!deductResult.ok) {
+    if (!accessResult.ok) {
       return NextResponse.json(
-        { error: `Kredit tidak cukup. Butuh ${CREDIT_COST_CHAT}, saldo: ${deductResult.balance}` },
+        { error: accessResult.reason },
         { status: 402 }
       )
     }
+
+    const shouldRefundOnError = accessResult.method === "credits"
 
     const { messages, canvas } = await req.json()
 
@@ -84,8 +86,8 @@ export async function POST(req: NextRequest) {
     })
 
     if (!response.ok) {
-      // ── Refund on failure ──
-      await refundCredits(session.user.id, CREDIT_COST_CHAT, "workflow-agent")
+      // ── Refund on failure (only if credits were deducted) ──
+      if (shouldRefundOnError) await refundCredits(session.user.id, CREDIT_COST_CHAT, "workflow-agent")
       const err = await response.text()
       console.error("[workflow-agent] OpenAI error:", err)
       return NextResponse.json({ error: "AI service error" }, { status: 502 })

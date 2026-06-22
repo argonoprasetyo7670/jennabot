@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { DynamicSidebar } from "@/components/dynamic-sidebar"
 import { GenerationQueueProvider } from "@/contexts/generation-queue"
 import { CreditsProvider } from "@/contexts/credits"
+import { SubscriptionProvider } from "@/contexts/subscription"
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Initialize theme from localStorage
@@ -24,16 +25,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <CreditsProvider>
-        <GenerationQueueProvider>
-          <TooltipProvider>
-            <SidebarProvider>
-              <DynamicSidebar />
-              <SidebarInset>
-                {children}
-              </SidebarInset>
-            </SidebarProvider>
-          </TooltipProvider>
-        </GenerationQueueProvider>
+        <SubscriptionProvider>
+          <GenerationQueueProvider>
+            <TooltipProvider>
+              <SidebarProvider>
+                <DynamicSidebar />
+                <SidebarInset>
+                  {children}
+                </SidebarInset>
+              </SidebarProvider>
+            </TooltipProvider>
+          </GenerationQueueProvider>
+        </SubscriptionProvider>
       </CreditsProvider>
     </SessionProvider>
   )

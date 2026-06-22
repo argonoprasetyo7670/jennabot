@@ -32,6 +32,10 @@ export async function POST(req: NextRequest) {
       })
       if (existing) {
         return NextResponse.json({ item: existing, alreadySaved: true })
+      } else {
+        // If it's a CDN URL but not in DB, it was likely deleted by cleanup scripts.
+        // Do NOT attempt to fetch and re-upload it (which would cause a 404 error).
+        return NextResponse.json({ error: "File has been deleted or expired" }, { status: 404 })
       }
     }
 

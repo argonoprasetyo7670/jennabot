@@ -61,6 +61,8 @@ export interface VideoJobMeta {
   userId: string
   videoCount: number
   feature: string
+  /** Original request body — stored for auto-retry on V2V moderation errors */
+  requestBody?: Record<string, unknown>
 }
 
 export interface VideoJobResult {

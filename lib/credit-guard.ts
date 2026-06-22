@@ -14,6 +14,97 @@ export const CREDIT_COST_STORYBOARD = 2 // per storyboard generation
 export const CREDIT_COST_CHARACTER = 3  // per character creation
 export const CREDIT_COST_VOICE = 3      // per voice creation
 
+/* ─── Guard Result Types ─── */
+export type GuardResult =
+  | { ok: true; method: "subscription"; balance: number; subscription: { plan: string; endDate: Date } }
+  | { ok: true; method: "credits"; balance: number }
+  | { ok: false; balance: number; reason: string }
+
+/**
+ * Check if a user has an active subscription.
+ * Returns subscription info if active and not expired, null otherwise.
+ */
+export async function checkSubscription(userId: string): Promise<{
+  plan: string
+  status: string
+  endDate: Date
+  planId: string | null
+} | null> {
+  const sub = await prisma.subscriptions.findUnique({
+    where: { userId },
+  })
+
+  if (!sub) return null
+  if (sub.status !== "active") return null
+  if (new Date() > sub.endDate) {
+    // Subscription expired — mark as expired in DB
+    await prisma.subscriptions.update({
+      where: { userId },
+      data: { status: "expired", updatedAt: new Date() },
+    })
+    return null
+  }
+
+  return {
+    plan: sub.plan,
+    status: sub.status,
+    endDate: sub.endDate,
+    planId: sub.planId,
+  }
+}
+
+/**
+ * Guard that checks subscription first, then falls back to credit deduction.
+ *
+ * Flow:
+ * 1. Active subscription → allow (no credit deduction)
+ * 2. No subscription → deduct credits
+ * 3. Neither → block (return ok: false)
+ */
+export async function guardAccess(
+  userId: string,
+  creditCost: number,
+  feature: string,
+  description: string
+): Promise<GuardResult> {
+  // ── Step 1: Check subscription ──
+  const sub = await checkSubscription(userId)
+  if (sub) {
+    // Get credit balance for informational purposes (not deducted)
+    const credits = await prisma.user_credits.findUnique({ where: { userId } })
+    const balance = credits?.balance ?? 0
+
+    console.log(
+      `[guard] Subscription active (${sub.plan}) for ${feature}. User: ${userId} — no credit deduction`
+    )
+
+    return {
+      ok: true,
+      method: "subscription",
+      balance,
+      subscription: { plan: sub.plan, endDate: sub.endDate },
+    }
+  }
+
+  // ── Step 2: Fall back to credits ──
+  const deductResult = await deductCredits(userId, creditCost, feature, description)
+
+  if (deductResult.ok) {
+    return {
+      ok: true,
+      method: "credits",
+      balance: deductResult.balance,
+    }
+  }
+
+  // ── Step 3: Neither subscription nor credits ──
+  return {
+    ok: false,
+    balance: deductResult.balance,
+    reason: `Kredit tidak cukup. Butuh ${creditCost}, saldo: ${deductResult.balance}. Berlangganan untuk akses unlimited.`,
+  }
+}
+
 /**
  * Check if a user has enough credits for an operation.
  * Returns current balance and whether it's sufficient.

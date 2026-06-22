@@ -443,15 +443,27 @@ function submitVideoJobToStore(
         // ── Poll until done ──
         const POLL_INTERVAL = 5000
         const MAX_POLLS = 60 // 5 minutes
+        let currentJobId = useapiJobId
 
         for (let i = 0; i < MAX_POLLS; i++) {
           await new Promise((r) => setTimeout(r, POLL_INTERVAL))
 
-          const pollRes = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(useapiJobId)}`)
+          const pollRes = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(currentJobId)}`)
           const pollData = await pollRes.json()
 
           if (pollData.status === "processing") {
             updateJobInStore(id, { progress: `Membuat video... (${(i + 1) * 5}s)` })
+            continue
+          }
+
+          // Server auto-retried due to V2V moderation error — switch to new job
+          if (pollData.status === "retrying" && pollData.newJobId) {
+            currentJobId = pollData.newJobId
+            updateJobInStore(id, {
+              serverJobId: currentJobId,
+              progress: `Moderasi terdeteksi, mencoba ulang (${pollData.retryAttempt || "?"})...`,
+            })
+            i = 0 // reset poll counter for the new job
             continue
           }
 
@@ -685,16 +697,28 @@ export function GenerationQueueProvider({ children }: { children: React.ReactNod
         ; (async () => {
           const POLL_INTERVAL = 5000
           const MAX_POLLS = 60 // 5 minutes
+          let currentJobId = serverJobId
 
           for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise((r) => setTimeout(r, POLL_INTERVAL))
 
             try {
-              const res = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(serverJobId)}`)
+              const res = await fetch(`/api/ai/video-generate?jobId=${encodeURIComponent(currentJobId)}`)
               const data = await res.json()
 
               if (data.status === "processing") {
                 updateJobInStore(localId, { progress: `Masih membuat video... (${(i + 1) * 5}s)` })
+                continue
+              }
+
+              // Server auto-retried due to V2V moderation error
+              if (data.status === "retrying" && data.newJobId) {
+                currentJobId = data.newJobId
+                updateJobInStore(localId, {
+                  serverJobId: currentJobId,
+                  progress: `Moderasi terdeteksi, mencoba ulang (${data.retryAttempt || "?"})...`,
+                })
+                i = 0
                 continue
               }
 
