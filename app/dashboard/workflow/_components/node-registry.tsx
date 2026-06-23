@@ -6,7 +6,8 @@ import type { NodeTypes } from "@xyflow/react"
 import {
   FileTextIcon, ImageIcon, VideoIcon, RefreshCwIcon, UploadIcon,
   LayoutGridIcon, ScissorsIcon, UserIcon, SlidersHorizontalIcon, MicIcon, Volume2Icon,
-  FolderPlusIcon, LinkIcon,
+  FolderPlusIcon, LinkIcon, GitBranchIcon, RepeatIcon, TimerIcon, FilterIcon,
+  GitMergeIcon, VariableIcon, StickyNoteIcon, SparklesIcon, SplitIcon
 } from "lucide-react"
 import { PromptNodeComponent } from "./nodes/prompt-node"
 import { ImageGenNodeComponent } from "./nodes/image-gen-node"
@@ -17,6 +18,11 @@ import {
   ExtractFrameNodeComponent, PoseNodeComponent, CameraControlNodeComponent,
   VoiceNodeComponent, TTSNodeComponent, ConcatenateNodeComponent,
 } from "./nodes/utility-nodes"
+import {
+  IfElseNodeComponent, LoopNodeComponent, DelayNodeComponent, FilterNodeComponent,
+  MergeNodeComponent, SetVariableNodeComponent, NoteNodeComponent, TextSplitterNodeComponent,
+  GeminiNodeComponent
+} from "./nodes/logic-nodes"
 
 /* ─── Node Type Registry ─── */
 export const nodeTypes: NodeTypes = {
@@ -34,24 +40,43 @@ export const nodeTypes: NodeTypes = {
   voiceNode: VoiceNodeComponent,
   ttsNode: TTSNodeComponent,
   concatNode: ConcatenateNodeComponent,
+  ifElseNode: IfElseNodeComponent,
+  loopNode: LoopNodeComponent,
+  delayNode: DelayNodeComponent,
+  filterNode: FilterNodeComponent,
+  mergeNode: MergeNodeComponent,
+  setVariableNode: SetVariableNodeComponent,
+  noteNode: NoteNodeComponent,
+  textSplitterNode: TextSplitterNodeComponent,
+  geminiNode: GeminiNodeComponent,
 }
 
 /* ─── Palette items ─── */
 export const PALETTE_ITEMS = [
-  { type: "promptNode", label: "Prompt", Icon: FileTextIcon },
-  { type: "imageGenNode", label: "Image", Icon: ImageIcon },
-  { type: "videoGenNode", label: "Video", Icon: VideoIcon },
-  { type: "extendVideoNode", label: "Extend", Icon: RefreshCwIcon },
-  { type: "concatNode", label: "Concat Video", Icon: LinkIcon },
-  { type: "uploadNode", label: "Upload", Icon: UploadIcon },
-  { type: "imageGridNode", label: "Image Grid", Icon: LayoutGridIcon },
-  // { type: "extractFrameNode", label: "Extract Frame", Icon: ScissorsIcon },
-  { type: "poseNode", label: "Pose", Icon: UserIcon },
-  { type: "cameraControlNode", label: "Camera", Icon: SlidersHorizontalIcon },
-  { type: "voiceNode", label: "Voice", Icon: MicIcon },
-  { type: "ttsNode", label: "TTS", Icon: Volume2Icon },
-  // { type: "galleryNode", label: "Save Gallery", Icon: FolderPlusIcon },
-  // { type: "outputNode", label: "Output", Icon: ImageIcon },
+  // Input / Basic
+  { type: "promptNode", label: "Prompt", Icon: FileTextIcon, group: "Input" },
+  { type: "uploadNode", label: "Upload", Icon: UploadIcon, group: "Input" },
+  { type: "noteNode", label: "Note", Icon: StickyNoteIcon, group: "Input" },
+  // AI Tools
+  { type: "geminiNode", label: "Gemini", Icon: SparklesIcon, group: "AI" },
+  { type: "imageGenNode", label: "Image", Icon: ImageIcon, group: "AI" },
+  { type: "videoGenNode", label: "Video", Icon: VideoIcon, group: "AI" },
+  { type: "ttsNode", label: "TTS", Icon: Volume2Icon, group: "AI" },
+  // Utility / Media
+  { type: "imageGridNode", label: "Image Grid", Icon: LayoutGridIcon, group: "Media" },
+  { type: "extendVideoNode", label: "Extend", Icon: RefreshCwIcon, group: "Media" },
+  { type: "concatNode", label: "Concat Video", Icon: LinkIcon, group: "Media" },
+  { type: "poseNode", label: "Pose", Icon: UserIcon, group: "Media" },
+  { type: "cameraControlNode", label: "Camera", Icon: SlidersHorizontalIcon, group: "Media" },
+  { type: "voiceNode", label: "Voice", Icon: MicIcon, group: "Media" },
+  // Logic & Flow
+  { type: "ifElseNode", label: "If / Else", Icon: GitBranchIcon, group: "Logic" },
+  { type: "loopNode", label: "Loop", Icon: RepeatIcon, group: "Logic" },
+  { type: "filterNode", label: "Filter", Icon: FilterIcon, group: "Logic" },
+  { type: "mergeNode", label: "Merge", Icon: GitMergeIcon, group: "Logic" },
+  { type: "delayNode", label: "Delay", Icon: TimerIcon, group: "Logic" },
+  { type: "textSplitterNode", label: "Splitter", Icon: SplitIcon, group: "Logic" },
+  { type: "setVariableNode", label: "Variable", Icon: VariableIcon, group: "Logic" },
 ]
 
 /* ─── Agent Input Box ─── */
