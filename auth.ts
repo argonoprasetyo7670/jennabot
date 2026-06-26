@@ -142,7 +142,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   user_credits: {
                     create: {
                       id: crypto.randomUUID(),
-                      balance: 70,
+                      balance: 20,
                       updatedAt: new Date(),
                     }
                   },
@@ -150,8 +150,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     create: {
                       id: crypto.randomUUID(),
                       type: "bonus",
-                      amount: 70,
-                      balance: 70,
+                      amount: 20,
+                      balance: 20,
                       description: "Free signup bonus",
                     }
                   }
