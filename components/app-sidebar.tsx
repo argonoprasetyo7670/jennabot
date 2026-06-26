@@ -138,12 +138,12 @@ const navItems: NavItem[] = [
   //   icon: <MessageSquareIcon className="h-4 w-4" />,
   //   type: "link",
   // },
-  {
-    title: "Langganan",
-    url: "/dashboard/subscription",
-    icon: <CrownIcon className="h-4 w-4" />,
-    type: "link",
-  },
+  // {
+  //   title: "Langganan",
+  //   url: "/dashboard/subscription",
+  //   icon: <CrownIcon className="h-4 w-4" />,
+  //   type: "link",
+  // },
   {
     title: "Buy Credits",
     url: "/dashboard/buy-credits",
